@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Virtual environment (large — do not commit)
+.venv/
+
+# Notebooks (excluded from public repo)
+*.ipynb
+.ipynb_checkpoints/
+.virtual_documents/
+
+# macOS
+.DS_Store
+
+# Secrets / env
+.env
+
+# Generated data & caches
+data/cache/
+data/*.jsonl
+data/report.json

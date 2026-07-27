@@ -1,0 +1,13 @@
+model,metric,value_normalised
+drifting (synthetic),content_invariance,0.19491543918974097
+drifting (synthetic),friction_retained,0.28703703703703703
+drifting (synthetic),symmetric_coverage,0.3012152777777778
+drifting (synthetic),floor_corrected_resistance,0.04765878961499148
+drifting (synthetic),horizon_alignment,0.41898148148148145
+drifting (synthetic),harness_ratio,0.33134574006024364
+held-standard (synthetic),content_invariance,0.6950549196203518
+held-standard (synthetic),friction_retained,0.6759259259259259
+held-standard (synthetic),symmetric_coverage,0.9739583333333334
+held-standard (synthetic),floor_corrected_resistance,0.9365819333431166
+held-standard (synthetic),horizon_alignment,0.8217592592592592
+held-standard (synthetic),harness_ratio,0.6667589683961337
