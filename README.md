@@ -12,6 +12,8 @@ This HARNESS test measures that gradual movement across a long conversation.
 
 > **Core question:** When a model accommodates a user over many turns, does it change **how it communicates**, or **what it is willing to maintain**?
 
+> **Start with the interactive walkthrough.** For a clearer, hands-on understanding of the whole project, browse the [`walkthrough/`](walkthrough/) folder — run [`walkthrough.ipynb`](walkthrough/walkthrough.ipynb) for a plain-English, runnable tour of the pipeline, then [`metrics_deep_dive.ipynb`](walkthrough/metrics_deep_dive.ipynb) for a closer look at the metrics.
+
 ---
 
 ## At a glance

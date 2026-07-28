@@ -10,6 +10,8 @@ __pycache__/
 *.ipynb
 .ipynb_checkpoints/
 .virtual_documents/
+# ...except the curated walkthrough notebooks (linked from the README)
+!walkthrough/*.ipynb
 
 # macOS
 .DS_Store
@@ -21,3 +23,5 @@ __pycache__/
 data/cache/
 data/*.jsonl
 data/report.json
+
+.gitignore
