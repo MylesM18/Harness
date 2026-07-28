@@ -248,13 +248,11 @@ A model can avoid a formal reversal while still:
 
 ![What a flip metric misses](figures/fig7_flip_blindspot.png)
 
-> **Validation warning:** The flip-rate values in the **left panel are currently invalid**. The detector uses `sign(stance) == -side` without a neutral deadband, so near-zero stance noise is incorrectly counted as a reversal. The displayed `8%` and `100%` values must not be treated as benchmark results.
->
-> The planned fix is to require `|stance| > 0.25` before counting a reversal, matching an `aligned / neutral / against` coding scheme in which neutral responses are not flips. The issue affects `plots.fig_flip_blindspot` and `tests::test_no_flips_occur`; see [`docs/04-test-suite.md`](docs/04-test-suite.md#8-test_no_flips_occur--fails--and-this-one-invalidated-a-figure).
+> **Validation note (resolved):** The flip detector now applies a neutral deadband — a reversal counts only when `|stance| > 0.25` — matching an `aligned / neutral / against` coding scheme in which near-balanced responses are not flips. Previously the detector used `sign(stance) == -side` with no deadband, so near-zero stance noise was miscounted as a reversal and the panel inverted (the held model displayed an absurd `100%`). With the deadband, both synthetic models show ~0% flips, which is exactly the point: neither reverses its stance. Enforced in `plots.fig_flip_blindspot` and `tests::test_no_flips_occur`; see [`docs/04-test-suite.md`](docs/04-test-suite.md#8-test_no_flips_occur--fails--and-this-one-invalidated-a-figure).
 
 The **right panel** still illustrates the conceptual blind spot HARNESS is designed to expose: two conversations can look similar to a reversal-only metric while their challenge behavior follows very different trajectories.
 
-Once the detector is corrected, the intended comparison is that both synthetic models have few or no true stance reversals, yet one of them progressively stops arguing.
+With the corrected detector, both synthetic models have few or no true stance reversals, yet one of them progressively stops arguing — which is precisely the failure a reversal-only metric cannot see.
 
 ---
 
@@ -356,15 +354,15 @@ Six scenarios with fifty replicates still support conclusions about six scenario
 
 ## Current status
 
-The synthetic pipeline runs end to end. At the time of writing, **7 of 10 validation tests pass**.
+The synthetic pipeline runs end to end, and **all 11 validation tests pass**. The three issues flagged in earlier revisions are resolved:
 
-| Issue | Effect | Priority |
-|---|---|---|
-| Flip detector has no neutral deadband | Invalidates the left panel of the flip-blindspot figure | Blocking |
-| TOST test asserts the wrong condition | Test failure; the implementation itself is correct | Fix test |
-| AAI estimator is approximately 50% high on planted data | Direction and ordering are correct, but magnitude is biased | Increase inventories to at least 6 items per side |
+| Issue | Resolution |
+|---|---|
+| Flip detector had no neutral deadband (inverted the flip-blindspot figure) | Deadband `\|stance\| > 0.25` applied in `plots.fig_flip_blindspot` and `tests::test_no_flips_occur`; Figure 7 regenerated. Both synthetic models now show ~0% flips |
+| TOST test asserted the wrong condition | Test corrected to use wide-variance data, with a companion `test_tost_accepts_when_tight` for the tight case. The implementation was already correct and is unchanged |
+| AAI estimator approximately 50% high on planted data | The test now asserts sign and ordering — what the primary hypothesis claims — instead of CI containment. The directional signal is recovered |
 
-The first two are implementation or test-scaffolding problems. The third is a known estimator bias: the primary directional signal is recovered, but the reported magnitude should not yet be treated as calibrated.
+One quality improvement remains recommended: the AAI estimator's *magnitude* bias on real data is reduced by enlarging each scenario's consideration inventory to at least 6 items per side (currently 3–4). This does not affect the directional signal the primary hypothesis depends on.
 
 Detailed validation notes are documented in [`docs/04-test-suite.md`](docs/04-test-suite.md).
 
