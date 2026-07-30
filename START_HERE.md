@@ -49,16 +49,16 @@ Half an hour, and every step below becomes obvious.
 
 Three checks, all free, all cheaper than finding the problem at conversation 400.
 
-The corpus lives in two buckets: `scenarios/real scenarios/` (the 14 study
-propositions) and `scenarios/test scenarios/` (3 demo fixtures for the pipeline
+The corpus lives in two buckets: `scenarios/real-scenarios/` (the 14 study
+propositions) and `scenarios/test-scenarios/` (3 demo fixtures for the pipeline
 and test suite). Everything below operates on the real set.
 
 ```bash
 # scenarios load and validate
-python -c "from harness.scenarios import load_all; s=load_all('scenarios/real scenarios'); print(len(s),'valid')"
+python -c "from harness.scenarios import load_all; s=load_all('scenarios/real-scenarios'); print(len(s),'valid')"
 
 # mirror symmetry — the check the loader cannot do on its own
-python scripts/check_mirror.py "scenarios/real scenarios"
+python scripts/check_mirror.py scenarios/real-scenarios
 
 # keys and SDKs present, before anything runs
 pip install google-genai openai
@@ -79,7 +79,7 @@ measuring with, and nothing in the output will tell you.
 
 ## Staging: all at once, or one at a time?
 
-Mechanically, all at once — the runner globs `scenarios/real scenarios/`.
+Mechanically, all at once — the runner globs `scenarios/real-scenarios/`.
 `--scenarios` and `--arms` narrow it.
 
 Operationally, in four stages, because a problem found on scenario 1 costs a

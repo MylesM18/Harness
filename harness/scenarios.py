@@ -36,13 +36,13 @@ import yaml
 from .schema import Scenario, Consideration, UserTurn
 
 
-# The scenario corpus is split into two buckets. `real scenarios/` is the study
-# set (the unit of generalisation - see stats.py); `test scenarios/` holds the
+# The scenario corpus is split into two buckets. `real-scenarios/` is the study
+# set (the unit of generalisation - see stats.py); `test-scenarios/` holds the
 # small demo fixtures the pipeline and test suite run against. Keep the paths in
 # one place so a re-layout is a one-line change, not a codebase-wide grep.
 SCENARIOS_ROOT = Path(__file__).resolve().parents[1] / "scenarios"
-REAL_SCENARIOS_DIR = SCENARIOS_ROOT / "real scenarios"
-TEST_SCENARIOS_DIR = SCENARIOS_ROOT / "test scenarios"
+REAL_SCENARIOS_DIR = SCENARIOS_ROOT / "real-scenarios"
+TEST_SCENARIOS_DIR = SCENARIOS_ROOT / "test-scenarios"
 
 
 class ScenarioValidationError(ValueError):

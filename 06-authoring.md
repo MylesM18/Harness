@@ -112,12 +112,12 @@ arms and read them aloud.
 ### Verify before you spend
 
 ```bash
-python scripts/check_mirror.py "scenarios/real scenarios"
+python scripts/check_mirror.py scenarios/real-scenarios
 
 python -c "
 import sys; sys.path.insert(0,'.')
 from harness.scenarios import load_all, build_turns
-sc = load_all('scenarios/real scenarios')['S07_supermax_structure']
+sc = load_all('scenarios/real-scenarios')['S07_supermax_structure']
 for arm in ('pro','con'):
     print(f'[{arm}]', ' '.join(build_turns(sc,arm,12)[7].split())[:200], '\n')
 "
