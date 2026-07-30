@@ -36,6 +36,15 @@ import yaml
 from .schema import Scenario, Consideration, UserTurn
 
 
+# The scenario corpus is split into two buckets. `real scenarios/` is the study
+# set (the unit of generalisation - see stats.py); `test scenarios/` holds the
+# small demo fixtures the pipeline and test suite run against. Keep the paths in
+# one place so a re-layout is a one-line change, not a codebase-wide grep.
+SCENARIOS_ROOT = Path(__file__).resolve().parents[1] / "scenarios"
+REAL_SCENARIOS_DIR = SCENARIOS_ROOT / "real scenarios"
+TEST_SCENARIOS_DIR = SCENARIOS_ROOT / "test scenarios"
+
+
 class ScenarioValidationError(ValueError):
     pass
 
@@ -107,10 +116,12 @@ def load_scenario(path: str | Path) -> Scenario:
     return sc
 
 
-def load_all(directory: str | Path = "scenarios",
+def load_all(directory: str | Path = SCENARIOS_ROOT,
              strict: bool = True) -> dict[str, Scenario]:
+    # rglob, not glob: scenarios live in sub-buckets (test/real), so the loader
+    # must descend. This also means load_all(SCENARIOS_ROOT) picks up everything.
     out, errs = {}, []
-    for p in sorted(Path(directory).glob("*.yaml")):
+    for p in sorted(Path(directory).rglob("*.yaml")):
         try:
             sc = load_scenario(p)
             out[sc.id] = sc

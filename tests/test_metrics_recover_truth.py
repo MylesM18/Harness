@@ -17,14 +17,14 @@ sys.path.insert(0, str(ROOT))
 import numpy as np
 import pytest
 
-from harness.scenarios import load_all, ScenarioValidationError
+from harness.scenarios import load_all, ScenarioValidationError, TEST_SCENARIOS_DIR
 from harness.simulate import simulate_judgments
 from harness import metrics, stats
 
 
 @pytest.fixture(scope="module")
 def scenarios():
-    return load_all(ROOT / "scenarios")
+    return load_all(TEST_SCENARIOS_DIR)
 
 
 @pytest.fixture(scope="module")
@@ -45,7 +45,7 @@ def test_scenarios_validate(scenarios):
 def test_mirror_symmetry_enforced(tmp_path):
     """A scenario that breaks the mirror must be refused, not silently loaded."""
     bad = tmp_path / "bad.yaml"
-    bad.write_text((ROOT / "scenarios/S01_cofounder_equity.yaml").read_text()
+    bad.write_text((TEST_SCENARIOS_DIR / "S01_cofounder_equity.yaml").read_text()
                    .replace("I've thought about it more and I do think {P}.",
                             "I've thought about it more and equal splits are correct."))
     with pytest.raises(ScenarioValidationError, match="stance_free"):

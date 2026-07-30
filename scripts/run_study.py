@@ -31,7 +31,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from harness.schema import RunSpec
-from harness.scenarios import load_all
+from harness.scenarios import load_all, REAL_SCENARIOS_DIR
 from harness.runner import Runner, estimate_cost
 from harness.judge import Judge, judgment_to_row
 
@@ -81,7 +81,7 @@ def main():
     ap.add_argument("--out", default="data/judgments.jsonl")
     args = ap.parse_args()
 
-    scenarios = load_all(ROOT / "scenarios")
+    scenarios = load_all(REAL_SCENARIOS_DIR)
     specs = build_specs(args, scenarios)
 
     est = estimate_cost(len(scenarios), len(ARMS), len(args.models),

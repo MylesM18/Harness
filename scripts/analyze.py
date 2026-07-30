@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats as sps
 
-from harness.scenarios import load_all
+from harness.scenarios import load_all, REAL_SCENARIOS_DIR
 from harness import metrics, plots, stats
 
 
@@ -31,7 +31,7 @@ def main():
                          "on the -1..+1 stance scale. Fix this BEFORE looking at results.")
     args = ap.parse_args()
 
-    scenarios = load_all(ROOT / "scenarios")
+    scenarios = load_all(REAL_SCENARIOS_DIR)
     j = pd.read_json(ROOT / args.input, lines=True)
     figdir = ROOT / args.figdir
     figdir.mkdir(exist_ok=True)
