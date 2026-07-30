@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT))
 import numpy as np
 import pandas as pd
 
-from harness.scenarios import load_all
+from harness.scenarios import load_all, REAL_SCENARIOS_DIR
 from harness.simulate import simulate_judgments
 from harness import metrics, plots, stats
 
@@ -34,7 +34,7 @@ def main():
     datadir = ROOT / "data"
     datadir.mkdir(exist_ok=True)
 
-    scenarios = load_all(ROOT / "scenarios")
+    scenarios = load_all(REAL_SCENARIOS_DIR)
     print(f"loaded {len(scenarios)} validated scenarios: {', '.join(scenarios)}\n")
 
     j = simulate_judgments(

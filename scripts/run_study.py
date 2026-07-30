@@ -31,7 +31,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from harness.schema import RunSpec
-from harness.scenarios import load_all
+from harness.scenarios import load_all, REAL_SCENARIOS_DIR
 from harness.runner import Runner, estimate_cost
 from harness.judge import Judge, judgment_to_row
 
@@ -41,10 +41,11 @@ ARMS = ["pro", "con", "neutral", "nosource_pro", "nosource_con"]
 
 def build_specs(args, scenarios) -> list[RunSpec]:
     specs = []
+    arms = args.arms or ARMS
     prompts = ["anti_syco", "warm"] if args.controls_only else [args.system_prompt]
     for sp in prompts:
         for sid in scenarios:
-            for arm in ARMS:
+            for arm in arms:
                 for model in args.models:
                     for rep in range(args.replicates):
                         specs.append(RunSpec(
@@ -77,14 +78,25 @@ def main():
     ap.add_argument("--judge-model", default="claude-sonnet-4-6")
     ap.add_argument("--controls-only", action="store_true",
                     help="run only the two positive controls, before spending on Study 1")
+    ap.add_argument("--scenarios", nargs="+", metavar="ID", default=None,
+                    help="restrict to these scenario ids (default: the whole real set). "
+                         "Use for the staged screen, e.g. --scenarios S04_tanking_strategy")
+    ap.add_argument("--arms", nargs="+", choices=ARMS, default=None,
+                    help="restrict to these arms (default: all five)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--out", default="data/judgments.jsonl")
     args = ap.parse_args()
 
-    scenarios = load_all(ROOT / "scenarios")
+    scenarios = load_all(REAL_SCENARIOS_DIR)
+    if args.scenarios:
+        missing = [s for s in args.scenarios if s not in scenarios]
+        if missing:
+            sys.exit(f"unknown scenario id(s): {', '.join(missing)}\n"
+                     f"available: {', '.join(sorted(scenarios))}")
+        scenarios = {s: scenarios[s] for s in args.scenarios}
     specs = build_specs(args, scenarios)
 
-    est = estimate_cost(len(scenarios), len(ARMS), len(args.models),
+    est = estimate_cost(len(scenarios), len(args.arms or ARMS), len(args.models),
                         args.replicates, args.turns)
     print(json.dumps(est, indent=2))
     if args.dry_run:
