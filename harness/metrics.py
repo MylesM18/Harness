@@ -463,3 +463,22 @@ def compute_all(judgments: pd.DataFrame, scenarios: dict[str, Scenario]) -> dict
         "disclosure": disclosure_rate(j),
         "judgments_enriched": j,
     }
+
+
+def compute_all_per_judge(judgments: pd.DataFrame,
+                          scenarios: dict[str, Scenario]) -> dict:
+    """Run the full battery SEPARATELY per `judge_model`, never pooled.
+
+    `compute_all` groups by `model`; it has no notion of `judge_model`, so a
+    multi-judge frame handed to a single `compute_all` call silently averages
+    independent coders. START_HERE.md prescribes reporting every metric per
+    judge instead. This loop keeps them apart: one `compute_all` battery per
+    distinct `judge_model`, keyed by that id.
+
+    A frame with no `judge_model` column (the single-judge legacy path) returns
+    one battery under the ``None`` key, so callers get a uniform shape either way.
+    """
+    if "judge_model" not in judgments.columns:
+        return {None: compute_all(judgments, scenarios)}
+    return {jm: compute_all(g, scenarios)
+            for jm, g in judgments.groupby("judge_model")}
