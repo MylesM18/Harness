@@ -43,6 +43,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+try:                                    # auto-load a repo-root .env into os.environ, so the
+    from dotenv import load_dotenv      # LIVE panel keys can live in .env instead of being
+    load_dotenv(ROOT / ".env")          # exported by hand. Already-exported vars win (override=False).
+except ImportError:                     # offline / wire-test path needs no keys and no dotenv.
+    pass
+
 import pandas as pd
 from tqdm import tqdm
 
