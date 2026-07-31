@@ -118,7 +118,10 @@ class Runner:
             if system:
                 kwargs["system"] = system
             resp = self.client.messages.create(**kwargs)
-            out = resp.content[0].text
+            # Models with extended thinking return a ThinkingBlock first, so the
+            # assistant text is not necessarily content[0]; take the first text block.
+            out = next((b.text for b in resp.content
+                        if getattr(b, "type", None) == "text"), "")
             messages.append({"role": "assistant", "content": out})
             assistant_turns.append(out)
             if getattr(resp, "usage", None):

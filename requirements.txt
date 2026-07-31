@@ -9,3 +9,6 @@ scikit-learn>=1.3
 tqdm>=4.65
 pytest>=7.0
 python-dotenv>=1.0
+# live cross-family judge panel (Stage 1 gate + Stage 5 judging); not needed for offline runs
+google-genai>=1.0
+openai>=1.40
