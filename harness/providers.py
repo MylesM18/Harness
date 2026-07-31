@@ -223,7 +223,7 @@ class GeminiJudgeClient:
     def __init__(self, model: str, api_key: Optional[str] = None):
         self.model = model
         try:
-            from google import genai            # lazy: not in requirements.txt
+            from google import genai            # lazy import: only needed for live runs
         except ImportError as e:                 # pragma: no cover
             raise ImportError(
                 "GeminiJudgeClient needs the google-genai SDK: "
@@ -236,14 +236,18 @@ class GeminiJudgeClient:
                 messages=None, system=None, **_kw) -> _Resp:
         user_text = "\n\n".join(m["content"] for m in (messages or [])
                                 if m.get("role") == "user")
+        # Gemini 3.x pro is a thinking model: too small a budget is spent entirely on
+        # the thinking phase and returns finish_reason=MAX_TOKENS with resp.text=None.
+        # Give headroom so the answer survives, and coalesce None -> "" so callers never
+        # subscript None (the same empty-answer trap the subject hit at low max_tokens).
         cfg = self._genai.types.GenerateContentConfig(
             system_instruction=system,
             temperature=temperature if temperature is not None else 0.0,
-            max_output_tokens=max_tokens or 1200,
+            max_output_tokens=max((max_tokens or 1200), 4000),
         )
         resp = self._client.models.generate_content(
             model=model or self.model, contents=user_text, config=cfg)
-        return _Resp(content=[_Block(text=resp.text)])
+        return _Resp(content=[_Block(text=resp.text or "")])
 
 
 class OpenAIJudgeClient:
@@ -267,7 +271,7 @@ class OpenAIJudgeClient:
     def __init__(self, model: str, api_key: Optional[str] = None):
         self.model = model
         try:
-            from openai import OpenAI            # lazy: not in requirements.txt
+            from openai import OpenAI            # lazy import: only needed for live runs
         except ImportError as e:                 # pragma: no cover
             raise ImportError(
                 "OpenAIJudgeClient needs the openai SDK: pip install openai") from e
@@ -280,10 +284,19 @@ class OpenAIJudgeClient:
         if system:
             chat.append({"role": "system", "content": system})
         chat += [m for m in (messages or []) if m.get("role") in ("user", "assistant")]
-        resp = self._client.chat.completions.create(
-            model=model or self.model, messages=chat,
-            temperature=temperature if temperature is not None else 0.0,
-            max_tokens=max_tokens or 1200)
+        name = model or self.model
+        # OpenAI reasoning models (o-series, gpt-5.x) reject `max_tokens` (need
+        # `max_completion_tokens`) and pin temperature to 1 (400 on temperature=0).
+        # Reasoning tokens count against the budget, so give ample headroom for the
+        # judge's JSON to still fit after the model finishes thinking.
+        is_reasoning = name.startswith(("o1", "o3", "o4", "gpt-5"))
+        kwargs = dict(model=name, messages=chat)
+        if is_reasoning:
+            kwargs["max_completion_tokens"] = max((max_tokens or 1200) * 4, 4000)
+        else:
+            kwargs["temperature"] = temperature if temperature is not None else 0.0
+            kwargs["max_tokens"] = max_tokens or 1200
+        resp = self._client.chat.completions.create(**kwargs)
         return _Resp(content=[_Block(text=resp.choices[0].message.content)])
 
 

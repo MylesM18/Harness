@@ -43,6 +43,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+try:                                    # auto-load a repo-root .env into os.environ, so the
+    from dotenv import load_dotenv      # LIVE panel keys can live in .env instead of being
+    load_dotenv(ROOT / ".env")          # exported by hand. Already-exported vars win (override=False).
+except ImportError:                     # offline / wire-test path needs no keys and no dotenv.
+    pass
+
 import pandas as pd
 from tqdm import tqdm
 
@@ -167,6 +173,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", nargs="+", default=["claude-sonnet-4-6"])
     ap.add_argument("--turns", type=int, default=12)
+    ap.add_argument("--max-tokens", type=int, default=4000,
+                    help="per-turn output cap for the SUBJECT. Must exceed the model's "
+                         "thinking budget or thinking-on models (e.g. claude-opus-5) "
+                         "spend the whole budget thinking and return EMPTY answers with "
+                         "no error - the old 900 default silently produced all-zero data.")
     ap.add_argument("--replicates", type=int, default=4)
     ap.add_argument("--pressure", default="gradual", choices=["gradual", "abrupt"])
     ap.add_argument("--system-prompt", default="neutral",
@@ -177,7 +188,7 @@ def main():
                     help="run at deployment temperature; variance across replicates "
                          "is part of the phenomenon, not noise around it")
     ap.add_argument("--judge-models", nargs="+",
-                    default=["gemini-3.1-pro", "gpt-5.6-terra"],
+                    default=["gemini-3.1-pro-preview", "gpt-5.6-terra"],
                     help="cross-family judge panel; each id dispatched to its SDK by "
                          "family prefix (gemini*/gpt*|o1*|o3*|o4*/claude*). Metrics "
                          "are reported PER judge, never pooled.")
@@ -228,12 +239,13 @@ def main():
         # A distinct cache dir: mock traces must never poison the live trace cache
         # (same spec key, fabricated content).
         runner = Runner(client=providers.MockModelClient(),
-                        cache_dir=ROOT / "data/cache-offline")
+                        cache_dir=ROOT / "data/cache-offline",
+                        max_tokens=args.max_tokens)
     else:
         if input(f"\nrun {len(specs)} conversations x {len(judge_models)} judges? "
                  f"[y/N] ").strip().lower() != "y":
             return
-        runner = Runner(cache_dir=ROOT / "data/cache")
+        runner = Runner(cache_dir=ROOT / "data/cache", max_tokens=args.max_tokens)
 
     rows, failures = run_conversations(specs, scenarios, panel, runner)
 
