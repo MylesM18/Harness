@@ -204,8 +204,15 @@ def denoise(div: pd.DataFrame, judgments: pd.DataFrame) -> pd.DataFrame:
     dn = _within_arm_noise(judgments, DELIVERY_NUMERIC).rename(columns={"noise": "delivery_noise"})
     out = div.merge(cn, on=["scenario_id", "model", "turn_index"], how="left")
     out = out.merge(dn, on=["scenario_id", "model", "turn_index"], how="left")
-    out["content_noise"] = out.content_noise.fillna(0.0)
-    out["delivery_noise"] = out.delivery_noise.fillna(0.0)
+    # A left-merge against the EMPTY noise frame (which _within_arm_noise returns
+    # whenever a group has <2 replicates - always true for a single judge at
+    # --replicates 1, as in Stage A/C) carries the empty frame's object-dtype
+    # `noise` column through as all-NaN object. fillna keeps it object, and
+    # np.sqrt below then raises "loop of ufunc ... float has no callable sqrt".
+    # Coerce to float so denoise is a numeric no-op at one replicate (noise=0)
+    # instead of crashing; harmless where the merge already produced float64.
+    out["content_noise"] = pd.to_numeric(out.content_noise, errors="coerce").fillna(0.0)
+    out["delivery_noise"] = pd.to_numeric(out.delivery_noise, errors="coerce").fillna(0.0)
     out["content_div_raw"] = out.content_div
     out["delivery_div_raw"] = out.delivery_div
     out["content_div"] = np.sqrt(np.clip(out.content_div ** 2 - out.content_noise ** 2, 0, None))
@@ -445,8 +452,39 @@ def profile_sensitivity(df: pd.DataFrame) -> pd.DataFrame:
 # assembly
 # ---------------------------------------------------------------------------
 
+def _stack_by(batteries: dict, col: str) -> dict:
+    """Concatenate single-condition batteries into one, tagging every tidy frame
+    with the condition it came from. Same metric keys as one battery; each frame
+    gains a `col` column so callers can filter by condition instead of pooling."""
+    metric_keys = next(iter(batteries.values())).keys()
+    out = {}
+    for k in metric_keys:
+        parts = [batt[k].assign(**{col: tag}) for tag, batt in batteries.items()]
+        out[k] = pd.concat(parts, ignore_index=True)
+    return out
+
+
 def compute_all(judgments: pd.DataFrame, scenarios: dict[str, Scenario]) -> dict:
-    """Run the full battery. Returns a dict of tidy frames, one per metric."""
+    """Run the full battery. Returns a dict of tidy frames, one per metric.
+
+    Two system prompts (the anti_syco vs warm positive controls) are distinct
+    experimental conditions and must never be pooled. They share every pairing
+    key - (scenario, model, replicate, turn) - so a single battery would pair
+    pro-vs-con ACROSS prompts: silently misaligning the duplicated index, or,
+    the moment one cell is missing (a refusal), crashing `_paired` with
+    "cannot handle a non-unique multi-index!". Split, run the single-prompt
+    battery on each, and stack the results tagged by prompt - exactly as
+    `compute_all_per_judge` keeps two judges apart. The single-prompt path
+    (Stage C/D real data, the synthetic fixtures) falls straight through
+    unchanged.
+    """
+    if ("system_prompt" in judgments.columns
+            and judgments["system_prompt"].nunique() > 1):
+        return _stack_by(
+            {sp: compute_all(g, scenarios)
+             for sp, g in judgments.groupby("system_prompt")},
+            "system_prompt")
+
     cov = coverage_and_attrition(judgments, scenarios)
     j = judgments.merge(
         cov[["scenario_id", "arm", "model", "replicate", "turn_index", "coverage"]],

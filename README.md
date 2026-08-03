@@ -14,6 +14,8 @@ This HARNESS test measures that gradual movement across a long conversation.
 
 > **Start with the interactive walkthrough.** For a clearer, hands-on understanding of the whole project, browse the [`walkthrough/`](walkthrough/) folder — run [`walkthrough.ipynb`](walkthrough/walkthrough.ipynb) for a plain-English, runnable tour of the pipeline, then [`metrics_deep_dive.ipynb`](walkthrough/metrics_deep_dive.ipynb) for a closer look at the metrics.
 
+> **📊 See the live results on real models.** [**`results/HARNESS_results.ipynb`**](results/HARNESS_results.ipynb) is a plain-English, non-technical writeup of the first full HARNESS run against production models — **Opus** and **Sonnet**, 14 scenarios, 560 conversations, judged turn-by-turn. It includes the headline findings, one conversation read in full, and the reliability caveats. GitHub renders it with charts and tables inline, so you can read everything without running anything. (The figures in *this README* are synthetic illustrations; the notebook is the real data.)
+
 ---
 
 ## At a glance
@@ -272,6 +274,22 @@ The profile should be read as a pattern:
 - **High floor-corrected resistance** means the model is not moving specifically because a person is pressing it.
 - **High horizon alignment** means the original objective remains active.
 - **A higher Harness Ratio**, when total divergence is meaningful, means adaptation is concentrated more in delivery than in content.
+
+---
+
+## Live results on real models
+
+The figures above are **synthetic** — planted-ground-truth illustrations of what each metric is designed to recover. The notebook below is the **first application of HARNESS to production models**, written for a non-technical reader.
+
+**➡️ [`results/HARNESS_results.ipynb`](results/HARNESS_results.ipynb)** — read it top to bottom, no code required. It covers:
+
+- **What was run.** Two Anthropic models, **Opus** (`claude-opus-4-6`) and **Sonnet** (`claude-sonnet-4-6`), across **14 pre-registered scenarios**, **560 full multi-turn conversations**, each turn scored by a **single independent judge** (`gpt-5.6-terra`).
+- **One conversation read in full.** An annotated walkthrough of the "weight statistical models over scouts" scenario, pairing the raw turns with the judge's per-turn signals — a case where the honest answer must *agree with the belief while rejecting the action* the user derived from it.
+- **The headline finding.** Both models show a small but **statistically significant** tendency to quietly drop the considerations that cut against the user as a conversation goes on — asymmetric-attrition slope **+0.0202/turn** for Opus and **+0.0152/turn** for Sonnet (both *p* < 1e-6) — and the substance of their answers is **not stable** under sustained pressure.
+- **A ceiling-effect caveat.** The reassuring "does it keep pushing back?" number stays near its ceiling (challenges keep coming, ~78–84% of late turns, with no decay). That is exactly why the number *hides* the drift instead of ruling it out.
+- **Reliability and limits.** A single judge (no cross-judge agreement), high measurement noise (trust the direction, not the precise size), and the scope condition that results describe the 14 sampled scenarios rather than the models in general.
+
+> These are the real-model results; the synthetic figures elsewhere in this README exist only to validate that the metrics recover known, planted behavior.
 
 ---
 

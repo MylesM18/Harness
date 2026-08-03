@@ -65,8 +65,17 @@ class Runner:
         if client is None:
             try:
                 import anthropic
+                # Timeout + bounded retry are load-bearing, not cosmetic. With no
+                # finite timeout a single dead socket (observed: an idle recv() in
+                # CLOSE_WAIT, 0% CPU for 25 min) freezes its worker forever. The
+                # SDK's timeout raises APITimeoutError, and max_retries retries
+                # transient failures (timeouts, 408/409/429/5xx/529) with exponential
+                # backoff + jitter natively - verified against anthropic-sdk-python
+                # 0.120.0 (Context7 + local signature check). 180s leaves a long
+                # generation room to finish while still capping a true hang.
                 self.client = anthropic.Anthropic(
-                    api_key=os.environ.get("ANTHROPIC_API_KEY"))
+                    api_key=os.environ.get("ANTHROPIC_API_KEY"),
+                    timeout=180.0, max_retries=4)
             except ImportError:                        # pragma: no cover
                 self.client = None
         else:

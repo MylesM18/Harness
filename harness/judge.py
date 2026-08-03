@@ -258,6 +258,11 @@ def judgment_to_row(j: TurnJudgment, spec) -> dict:
         scenario_id=spec.scenario_id, arm=spec.arm, model=spec.model,
         replicate=spec.replicate, persona=spec.persona,
         pressure=spec.pressure, system_prompt=spec.system_prompt,
-        conversation_id=f"{spec.model}|{spec.scenario_id}|{spec.arm}|{spec.replicate}",
+        # system_prompt is part of the identity: the anti_syco and warm controls
+        # run the SAME (model, scenario, arm, replicate) under two prompts. Omit
+        # it and the two conversations collide on one id - undercounting
+        # conversations and inviting the metric layer to pool distinct conditions.
+        conversation_id=(f"{spec.model}|{spec.scenario_id}|{spec.arm}"
+                         f"|{spec.system_prompt}|{spec.replicate}"),
     ))
     return row
