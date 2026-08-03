@@ -38,6 +38,7 @@ import argparse
 import json
 import re
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -98,30 +99,63 @@ def _safe_judge_id(judge_model: str) -> str:
     return re.sub(r"[^0-9A-Za-z]+", "_", judge_model)
 
 
-def run_conversations(specs, scenarios, panel, runner):
+def _run_one_conversation(spec, scenarios, panel, runner):
+    """Run one spec end to end (subject conversation + every judge on every turn)
+    and return (rows, failures) for that spec ALONE. All exceptions are caught and
+    turned into failure records so a single bad conversation never propagates out
+    of its worker thread. This is the unit of concurrency in run_conversations."""
+    rows, failures = [], []
+    sc = scenarios[spec.scenario_id]
+    try:
+        trace = runner.run(spec, sc)
+    except Exception as e:                                  # noqa: BLE001
+        failures.append({"spec": spec.key, "stage": "run", "err": str(e)})
+        return rows, failures
+
+    user_turns = [m["content"] for m in trace.messages if m["role"] == "user"]
+    for i, (ut, at) in enumerate(zip(user_turns, trace.assistant_turns), start=1):
+        for judge in panel.judges:
+            try:
+                j = judge.judge_turn(sc, ut, at, spec.key, i)
+                rows.append(judgment_to_row(j, spec))
+            except Exception as e:                          # noqa: BLE001
+                failures.append({"spec": spec.key, "stage": "judge",
+                                 "turn": i, "judge": judge.model, "err": str(e)})
+    return rows, failures
+
+
+def run_conversations(specs, scenarios, panel, runner, workers=8):
     """Run every spec through the runner, then judge each turn with EVERY panel
     member independently. Iterating panel.judges (rather than panel.judge_turn)
     means one judge failing on a turn does not drop the others' codings; each
     failure is logged against its own judge model id. Rows carry judge_model via
-    judgment_to_row, so the combined frame is separable downstream."""
-    rows, failures = [], []
-    for spec in tqdm(specs, desc="conversations"):
-        sc = scenarios[spec.scenario_id]
-        try:
-            trace = runner.run(spec, sc)
-        except Exception as e:                              # noqa: BLE001
-            failures.append({"spec": spec.key, "stage": "run", "err": str(e)})
-            continue
+    judgment_to_row, so the combined frame is separable downstream.
 
-        user_turns = [m["content"] for m in trace.messages if m["role"] == "user"]
-        for i, (ut, at) in enumerate(zip(user_turns, trace.assistant_turns), start=1):
-            for judge in panel.judges:
-                try:
-                    j = judge.judge_turn(sc, ut, at, spec.key, i)
-                    rows.append(judgment_to_row(j, spec))
-                except Exception as e:                      # noqa: BLE001
-                    failures.append({"spec": spec.key, "stage": "judge",
-                                     "turn": i, "judge": judge.model, "err": str(e)})
+    Specs run CONCURRENTLY across a thread pool (`workers`), because each 12-turn
+    conversation is I/O-bound - the subject generation plus 24 blocking judge calls
+    dominate wall-clock - so a sequential loop over 560 conversations is a multi-day
+    job while a pool of 8 finishes in hours. Turns WITHIN a conversation stay
+    sequential (each turn's history feeds the next), and each spec caches to its own
+    data/cache/<key>.json, so parallel specs never contend on disk. Each worker
+    returns its own (rows, failures) and the main thread concatenates - there is no
+    shared mutable state to lock. workers=1 degrades to effectively sequential. Row
+    order is completion order, not spec order; every downstream consumer groups by
+    column, so this is immaterial."""
+    rows, failures = [], []
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
+        futures = {ex.submit(_run_one_conversation, spec, scenarios, panel, runner): spec
+                   for spec in specs}
+        for fut in tqdm(as_completed(futures), total=len(futures), desc="conversations"):
+            try:
+                r, f = fut.result()
+            except Exception as e:                          # noqa: BLE001
+                # A worker should never raise (all inner errors are caught above),
+                # but if one ever does, log it rather than losing the whole batch.
+                failures.append({"spec": futures[fut].key, "stage": "worker",
+                                 "err": str(e)})
+                continue
+            rows.extend(r)
+            failures.extend(f)
     return rows, failures
 
 
@@ -204,6 +238,11 @@ def main():
                          "Use for the staged screen, e.g. --scenarios S04_tanking_strategy")
     ap.add_argument("--arms", nargs="+", choices=ARMS, default=None,
                     help="restrict to these arms (default: all five)")
+    ap.add_argument("--workers", type=int, default=8,
+                    help="conversations run concurrently across this many threads. "
+                         "Turns within a conversation stay sequential; only distinct "
+                         "specs parallelize. Start conservative (8) to avoid 429s; "
+                         "raise if the providers tolerate it. --workers 1 is sequential.")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--out", default="data/judgments.jsonl")
     args = ap.parse_args()
@@ -247,7 +286,9 @@ def main():
             return
         runner = Runner(cache_dir=ROOT / "data/cache", max_tokens=args.max_tokens)
 
-    rows, failures = run_conversations(specs, scenarios, panel, runner)
+    print(f"[concurrency] {args.workers} workers over {len(specs)} conversations")
+    rows, failures = run_conversations(specs, scenarios, panel, runner,
+                                       workers=args.workers)
 
     out = ROOT / args.out
     per_judge = write_judgments(rows, out)

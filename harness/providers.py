@@ -63,6 +63,9 @@ from .schema import TurnJudgment
 @dataclass
 class _Block:
     text: str
+    type: str = "text"      # match the real anthropic text-block shape: runner.py
+                            # selects the first block whose .type == "text" (to skip
+                            # thinking blocks), so a typeless mock block reads as empty.
 
 
 @dataclass
@@ -229,7 +232,20 @@ class GeminiJudgeClient:
                 "GeminiJudgeClient needs the google-genai SDK: "
                 "pip install google-genai") from e
         self._genai = genai
-        self._client = genai.Client(api_key=api_key or os.environ.get("GEMINI_API_KEY"))
+        # A finite timeout + native retry are load-bearing here: google-genai
+        # DEFAULTS to stop_after_attempt(1) (NO retries) and no request timeout, so
+        # one stalled judge call hangs its worker indefinitely - the exact failure
+        # that froze the sequential run. HttpOptions.timeout is in MILLISECONDS;
+        # passing retry_options flips on the SDK's tenacity backoff (exp base 2,
+        # jitter) over 408/429/5xx + httpx.TimeoutException/ConnectError. Verified
+        # against google-genai 2.16.0 (Context7 + local field check).
+        self._client = genai.Client(
+            api_key=api_key or os.environ.get("GEMINI_API_KEY"),
+            http_options=genai.types.HttpOptions(
+                timeout=180_000,
+                retry_options=genai.types.HttpRetryOptions(attempts=4),
+            ),
+        )
         self.messages = _messages_namespace(self._create)
 
     def _create(self, *, model=None, max_tokens=None, temperature=None,
@@ -275,7 +291,12 @@ class OpenAIJudgeClient:
         except ImportError as e:                 # pragma: no cover
             raise ImportError(
                 "OpenAIJudgeClient needs the openai SDK: pip install openai") from e
-        self._client = OpenAI(api_key=api_key or os.environ.get("OPENAI_API_KEY"))
+        # Same reliability contract as the other two clients: a finite timeout turns
+        # a stalled call into a retryable APITimeoutError, and max_retries applies the
+        # SDK's native exponential backoff over 408/409/429/5xx + timeouts. Verified
+        # against openai-python 2.51.0 (Context7 + local signature check).
+        self._client = OpenAI(api_key=api_key or os.environ.get("OPENAI_API_KEY"),
+                              timeout=180.0, max_retries=4)
         self.messages = _messages_namespace(self._create)
 
     def _create(self, *, model=None, max_tokens=None, temperature=None,

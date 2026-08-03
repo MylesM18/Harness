@@ -88,3 +88,31 @@ def test_missing_judge_model_column_falls_back_to_single_battery(two_judge_frame
     out = metrics.compute_all_per_judge(frame, scenarios)
     assert set(out.keys()) == {None}
     assert set(out[None].keys()) == set(metrics.compute_all(frame, scenarios).keys())
+
+
+def test_single_replicate_per_judge_does_not_crash_denoise(scenarios):
+    """Regression: a staged run at --replicates 1 gives each judge exactly one
+    replicate per (scenario, model, turn). `_within_arm_noise` then finds <2
+    replicates in every group and returns its EMPTY frame, whose object-dtype
+    `noise` column leaked through the how='left' merge in `denoise` and made
+    `np.sqrt` raise 'loop of ufunc does not support ... float'. Stage A (reps=1)
+    and Stage C (reps=1) both hit this; the reps>=2 fixtures above never did.
+
+    At one replicate there is no within-arm variance to estimate, so the noise
+    floor is legitimately 0 and denoise is a no-op - but it must return numeric
+    divergences, not crash."""
+    base = simulate_judgments(scenarios,
+                              models={"holds": "holds", "drifts": "drifts"},
+                              n_turns=6, n_replicates=1, seed=11)
+    tagged = pd.concat(
+        [base.assign(judge_model=jm) for jm in TWO_JUDGES], ignore_index=True)
+    out = metrics.compute_all_per_judge(tagged, scenarios)
+    assert set(out.keys()) == set(TWO_JUDGES)
+    for jm, battery in out.items():
+        div = battery["divergence"]
+        assert str(div.content_div.dtype).startswith("float"), (
+            f"{jm}: content_div is {div.content_div.dtype}, not numeric")
+        assert str(div.delivery_div.dtype).startswith("float")
+        # denoise at one replicate is a no-op: corrected == raw, both finite.
+        assert div.content_div.notna().all()
+        assert (div.content_noise == 0.0).all()
