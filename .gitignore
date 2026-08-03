@@ -12,8 +12,11 @@ __pycache__/
 .virtual_documents/
 # ...except the curated walkthrough notebooks (linked from the README)
 !walkthrough/*.ipynb
-# ...but this one is a working notebook, not for the public repo
+# ...but these are working notebooks, not for the public repo
 walkthrough/real_scenario_walkthrough.ipynb
+walkthrough/real_scenario_walkthrough_live.ipynb
+# ...and publish the real-model results notebook (linked from the README)
+!results/HARNESS_results.ipynb
 
 # macOS
 .DS_Store
@@ -29,5 +32,6 @@ data/report.json
 # Local-only working files (excluded from public repo)
 START_HERE.md
 docs/superpowers/
+build_notebook.py
 
 .gitignore
