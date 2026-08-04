@@ -236,12 +236,12 @@ Read these before quoting anything:
 
 | Work | Primary measure | Turns | Remaining gap |
 |---|---|---:|---|
-| SycEval (Fanous, 2025) | Factual capitulation under rebuttal | 1–2 | Only the most visible form |
-| ELEPHANT (Cheng) | Social sycophancy vs. human baselines | 1 | Single-turn |
-| SYCON-Bench (Hong, 2025) | Turn-of-Flip / Number-of-Flips | 5 | No-flip drift stays invisible |
-| BASIL (Atwell, 2025) | Shift vs. a Bayesian-rational agent | 1 | Needs a defensible prior |
-| AEDI (Botas) | Credence slope under user valence | 1 | Single-turn |
-| SWAY (Bhalla) | Counterfactual framing pressure | 1 | Single-turn |
+| SycEval (Fanous et al. 2025; arXiv:2502.08177) | Factual capitulation under rebuttal | 1–2 | Only the most visible form |
+| ELEPHANT (Cheng et al. 2025; arXiv:2505.13995) | Social sycophancy vs. human baselines | 1 | Single-turn |
+| SYCON-Bench (Hong et al. 2025; arXiv:2505.23840) | Turn-of-Flip / Number-of-Flips | 5 | No-flip drift stays invisible |
+| BASIL (Atwell et al. 2025; arXiv:2508.16846) | Shift vs. a Bayesian-rational agent | 1 | Needs a defensible prior |
+| AEDI (Botas et al. 2026; arXiv:2606.07897) | Credence slope under user valence | 1 | Single-turn |
+| SWAY (Bhalla & Gligorić 2026; arXiv:2604.02423) | Counterfactual framing pressure | 1 | Single-turn |
 | **HARNESS** | **Channel-split drift + omission asymmetry** | **12–24** | **Measures interaction-level drift** |
 
 The closest relative is SYCON-Bench, and the live run demonstrated exactly the difference: a flip is a discrete event, accommodation is continuous. A model can *never* reverse — the real subjects converged to neutral, not endorsement — while still shedding friction and dropping the considerations that cut against the user. HARNESS makes that movement measurable. Full comparison: [`docs/03-prior-art.md`](docs/03-prior-art.md).
@@ -250,7 +250,7 @@ The closest relative is SYCON-Bench, and the live run demonstrated exactly the d
 
 ## References
 
-See [`docs/03-prior-art.md`](docs/03-prior-art.md) for the annotated list. Key entries: Fanous et al., *SycEval* (arXiv:2502.08177); Hong et al., *Measuring Sycophancy of LLMs in Multi-turn Dialogues* (arXiv:2505.23840); Liu et al., *TRUTH DECAY* (arXiv:2503.11656); Atwell et al., *BASIL* (arXiv:2508.16846); Rathje et al., *Sycophantic AI Increases Attitude Extremity and Overconfidence*; Cheng et al., *ELEPHANT*; plus the 2026 preprints cited inline in the docs.
+See [`docs/03-prior-art.md`](docs/03-prior-art.md) for the annotated list. Years are first-preprint (arXiv v1) years throughout. Key entries: Fanous et al., *SycEval* (arXiv:2502.08177); Hong et al., *Measuring Sycophancy of LLMs in Multi-turn Dialogues* (arXiv:2505.23840); Liu et al., *TRUTH DECAY* (arXiv:2503.11656); Atwell et al., *BASIL* (arXiv:2508.16846); Cheng et al., *ELEPHANT* (arXiv:2505.13995); Rathje et al., *Sycophantic AI Increases Attitude Extremity and Overconfidence* (not on arXiv; behavioral-science venue). Two distinct Jain teams are cited in the docs — Jain, Yost & Abdullah, *Gotta Catch them all: the modes of Sycophancy* (arXiv:2607.20146) and Jain, Park, Viana, Wilson & Calacci, *Interaction Context Often Increases Sycophancy in LLMs* (arXiv:2509.12517) — plus the other 2025–26 preprints cited inline in the docs.
 
 ---
 
