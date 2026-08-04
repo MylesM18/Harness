@@ -14,7 +14,7 @@ This HARNESS test measures that gradual movement across a long conversation.
 
 > **Start with the interactive walkthrough.** For a clearer, hands-on understanding of the whole project, browse the [`walkthrough/`](walkthrough/) folder — run [`walkthrough.ipynb`](walkthrough/walkthrough.ipynb) for a plain-English, runnable tour of the pipeline, then [`metrics_deep_dive.ipynb`](walkthrough/metrics_deep_dive.ipynb) for a closer look at the metrics.
 
-> **📊 See the live results on real models.** [**`results/HARNESS_results.ipynb`**](results/HARNESS_results.ipynb) is a plain-English, non-technical writeup of the first full HARNESS run against production models — **Opus** and **Sonnet**, 14 scenarios, 560 conversations, judged turn-by-turn. It includes the headline findings, one conversation read in full, and the reliability caveats. GitHub renders it with charts and tables inline, so you can read everything without running anything. (The figures in *this README* are synthetic illustrations; the notebook is the real data.)
+> **📊 See the live results on real models.** [**`results/HARNESS_results.ipynb`**](results/HARNESS_results.ipynb) is a plain-English, non-technical writeup of the first full HARNESS run against production models — **Opus 4.6** and **Sonnet 4.6**, 14 scenarios, 560 conversations, each turn scored by **two independent cross-family judges** (`gpt-5.6-terra` and `gemini-3.1-pro-preview`). It includes the headline finding — which **replicates across both judges** — one conversation read in full, and honest reliability caveats (including one primary code that does *not* clear cross-judge agreement). GitHub renders it with charts and tables inline, so you can read everything without running anything. (The figures in *this README* are synthetic illustrations; the notebook is the real data.)
 
 ---
 
@@ -248,6 +248,8 @@ A model can avoid a formal reversal while still:
 - selectively retaining favorable evidence; and
 - drifting away from the original objective.
 
+On the first real run this is exactly what the data show, and a flip count is doubly the wrong instrument there: it rests on the *least* reliable code (the recommendation label, cross-judge α ≈ 0.45), while the drift it is meant to catch shows up in the **stance trajectory** — the *most* reliable code (α ≈ 0.87) — which moves from clear resistance (≈ −0.25) to ≈neutral (≈ +0.04) without ever reaching endorsement. See the results notebook, §1.
+
 ![What a flip metric misses](figures/fig7_flip_blindspot.png)
 
 > **Validation note (resolved):** The flip detector now applies a neutral deadband — a reversal counts only when `|stance| > 0.25` — matching an `aligned / neutral / against` coding scheme in which near-balanced responses are not flips. Previously the detector used `sign(stance) == -side` with no deadband, so near-zero stance noise was miscounted as a reversal and the panel inverted (the held model displayed an absurd `100%`). With the deadband, both synthetic models show ~0% flips, which is exactly the point: neither reverses its stance. Enforced in `plots.fig_flip_blindspot` and `tests::test_no_flips_occur`; see [`docs/04-test-suite.md`](docs/04-test-suite.md#8-test_no_flips_occur--fails--and-this-one-invalidated-a-figure).
@@ -283,11 +285,11 @@ The figures above are **synthetic** — planted-ground-truth illustrations of wh
 
 **➡️ [`results/HARNESS_results.ipynb`](results/HARNESS_results.ipynb)** — read it top to bottom, no code required. It covers:
 
-- **What was run.** Two Anthropic models, **Opus** (`claude-opus-4-6`) and **Sonnet** (`claude-sonnet-4-6`), across **14 pre-registered scenarios**, **560 full multi-turn conversations**, each turn scored by a **single independent judge** (`gpt-5.6-terra`).
+- **What was run.** Two Anthropic models, **Opus 4.6** (`claude-opus-4-6`) and **Sonnet 4.6** (`claude-sonnet-4-6`), across **14 pre-registered scenarios**, **560 full multi-turn conversations**, each turn scored — blind and single-turn — by **two independent cross-family judges** (`gpt-5.6-terra` and `gemini-3.1-pro-preview`), 6,496 turns each. *(Subjects are the 4.6 generation, preceding Opus 5 / Sonnet 5; results describe those models.)*
 - **One conversation read in full.** An annotated walkthrough of the "weight statistical models over scouts" scenario, pairing the raw turns with the judge's per-turn signals — a case where the honest answer must *agree with the belief while rejecting the action* the user derived from it.
-- **The headline finding.** Both models show a small but **statistically significant** tendency to quietly drop the considerations that cut against the user as a conversation goes on — asymmetric-attrition slope **+0.0202/turn** for Opus and **+0.0152/turn** for Sonnet (both *p* < 1e-6) — and the substance of their answers is **not stable** under sustained pressure.
+- **The headline finding — and it replicates.** Both models show a small but **statistically significant** tendency to quietly drop the considerations that cut against the user as a conversation goes on — asymmetric-attrition slope **+0.0202/turn** for Opus and **+0.0152/turn** for Sonnet (both *p* < 1e-6). The **independent cross-family judge reproduces it** (Gemini: Opus **+0.0195**, Sonnet **+0.0146**, both 95% CIs excluding zero), so it is not an artifact of one scorer. Read a second way — the reliable **stance trajectory** (the most-agreed code, α ≈ 0.87) — the models start clearly resisting the user (≈ −0.25) and **converge to ≈neutral (≈ +0.04)** by the end: a large drift toward the user that stops at the line and never swings to genuine endorsement (which a flip count is blind to).
 - **A ceiling-effect caveat.** The reassuring "does it keep pushing back?" number stays near its ceiling (challenges keep coming, ~78–84% of late turns, with no decay). That is exactly why the number *hides* the drift instead of ruling it out.
-- **Reliability and limits.** A single judge (no cross-judge agreement), high measurement noise (trust the direction, not the precise size), and the scope condition that results describe the 14 sampled scenarios rather than the models in general.
+- **Reliability and limits — reported per judge, never pooled.** The two judges split cleanly by primary: the **AAI code** (`considerations_present`) reaches cross-judge **α ≈ 0.76** (and considerations Jaccard ≈ 0.63) — above the 0.67 bar — so the AAI result carries. The **friction code** (`contains_challenge`) reaches only **α ≈ 0.60** — below the bar — because the judges apply systematically different thresholds to "unsolicited challenge"; **friction survival is therefore downgraded to exploratory**, defended only by the fact that both judges produce the same-signed trajectory (direction, not level). Add high measurement noise on the divergence-channel metrics (trust the direction, not the precise size) and the scope condition that results describe the 14 sampled scenarios rather than the models in general.
 
 > These are the real-model results; the synthetic figures elsewhere in this README exist only to validate that the metrics recover known, planted behavior.
 
@@ -382,6 +384,8 @@ The synthetic pipeline runs end to end, and **all 11 validation tests pass**. Th
 
 One quality improvement remains recommended: the AAI estimator's *magnitude* bias on real data is reduced by enlarging each scenario's consideration inventory to at least 6 items per side (currently 3–4). This does not affect the directional signal the primary hypothesis depends on.
 
+**On the real side**, the first full run against production models is complete and now carries a **second, cross-family judge** (`gemini-3.1-pro-preview`, 6,496 turns): the AAI finding **replicates** across both judges and Krippendorff's α is reported per code, per judge. The one exception is `contains_challenge` (α ≈ 0.60), which falls below the 0.67 bar, so friction survival is reported as exploratory. See [**Live results on real models**](#live-results-on-real-models).
+
 Detailed validation notes are documented in [`docs/04-test-suite.md`](docs/04-test-suite.md).
 
 ---
@@ -390,9 +394,9 @@ Detailed validation notes are documented in [`docs/04-test-suite.md`](docs/04-te
 
 ### Judge validity is the weakest link
 
-Every downstream metric depends on the extraction judge. A stratified 10% sample should be coded by humans, and Krippendorff's α should be reported in the main results table.
+Every downstream metric depends on the extraction judge. The first real run addresses this head-on: every turn is scored by a **second, cross-family judge** (`gemini-3.1-pro-preview`), and **Krippendorff's α is reported per code, per judge, in the results notebook** — never pooled, never buried. A stratified human-coded subsample is the remaining piece and is still recommended.
 
-When agreement falls below α = .67, the affected measure should be reported as unvalidated and excluded from inference. `discloses_accommodation` and `emotional_mirroring` are expected to be among the most difficult fields to validate reliably.
+Agreement below **α = .67** means the measure is reported as exploratory and excluded from inference. On the real run that bar sorts the codes cleanly: `considerations_present` (the AAI code, **α ≈ 0.76**), `stance` (**≈ 0.87**), `praise_of_user`, and `validation_language` clear it; **`contains_challenge`** (the friction code, **α ≈ 0.60**), `recommendation`, `discloses_accommodation`, and `emotional_mirroring` do not. `contains_challenge` is the consequential failure — a declared primary (friction survival) rests on it — so that finding is reported as exploratory pending a sharper "unsolicited challenge" rubric. The AAI primary is unaffected: it rides on a different, adequately-reliable code and replicates across both judges.
 
 ### Scripted pressure is not natural conversation
 
