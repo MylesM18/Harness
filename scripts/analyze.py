@@ -32,12 +32,28 @@ def main():
     args = ap.parse_args()
 
     scenarios = load_all(REAL_SCENARIOS_DIR)
-    j = pd.read_json(ROOT / args.input, lines=True)
+    j_all = pd.read_json(ROOT / args.input, lines=True)
     figdir = ROOT / args.figdir
     figdir.mkdir(exist_ok=True)
 
+    # Never pool judges. compute_all groups by `model` and has NO notion of
+    # judge_model, so a two-judge frame handed to a single compute_all call unions
+    # the coders (coverage_and_attrition does present.update across the whole
+    # group) - which is worse than averaging. So: the figures and the top-level
+    # report describe the PRIMARY judge alone (the original single-judge study,
+    # headline-preserving), and a separate per-judge loop below reports every
+    # judge's AAI slope with nothing pooled. See metrics.compute_all_per_judge.
+    judges = list(j_all.judge_model.value_counts().index)   # most rows first
+    primary = judges[0]
+    j = j_all[j_all.judge_model == primary].copy()
+    if len(judges) > 1:
+        print(f"{len(judges)} judges present: {', '.join(judges)}")
+        print(f"primary judge (figures + top-level report): {primary}")
+        print("metrics computed PER JUDGE, never pooled.\n")
+
     print(f"{len(j):,} judgments | {j.conversation_id.nunique()} conversations "
-          f"| {j.scenario_id.nunique()} scenarios | {j.model.nunique()} models\n")
+          f"| {j.scenario_id.nunique()} scenarios | {j.model.nunique()} models "
+          f"| judge {primary}\n")
 
     if j.scenario_id.nunique() < 8:
         print("!! fewer than 8 scenarios. Results describe this scenario set, not "
@@ -101,10 +117,37 @@ def main():
     plots.fig_profile_scorecard(pd.DataFrame(rows), figdir / "fig5_profile_scorecard.png")
 
     report["_multiplicity_secondary"] = stats.benjamini_hochberg(pvals).to_dict("records")
+
+    # ---- replication across judges: AAI slope per judge per model -----------
+    # The primary result is Opus/Sonnet AAI drifting UP over turns. The point of a
+    # second judge is to ask whether that reproduces. Each judge is scored on its
+    # OWN rows through its own compute_all battery; the slopes are never averaged.
+    per_judge = {}
+    print("\nAAI slope per judge per model  (positive = drift toward the user):")
+    print(f"  {'judge':26s} {'model':20s} {'slope/turn':>11s} {'95% CI':>22s} {'n_turns':>8s}")
+    for jm in judges:
+        jd = j_all[j_all.judge_model == jm]
+        ob = metrics.compute_all(jd, scenarios)
+        cov = ob["coverage_attrition"]
+        per_judge[jm] = {}
+        for m in sorted(jd.model.unique()):
+            dcov = cov[(cov.model == m) & (cov.arm.isin(["pro", "con"]))]
+            a = stats.simple_slope(dcov, "aai")
+            per_judge[jm][m] = a
+            if a:
+                print(f"  {jm:26s} {m:20s} {a['slope_per_turn']:+.4f}     "
+                      f"[{a['ci_lo']:+.4f}, {a['ci_hi']:+.4f}]  {a['n_obs']:8d}")
+            else:
+                print(f"  {jm:26s} {m:20s} {'(insufficient data)':>44s}")
+    report["_per_judge_aai"] = per_judge
+
     report["_scope"] = {
         "n_scenarios": int(j.scenario_id.nunique()),
         "generalises_to": "this scenario set" if j.scenario_id.nunique() < 8 else "the sampled domains",
-        "judge_model": sorted(j.judge_model.unique().tolist()),
+        # primary judge FIRST, so downstream readers that take [0] (the notebook)
+        # get the primary judge, not an alphabetical accident. All judges listed.
+        "judge_model": [primary] + [x for x in judges if x != primary],
+        "primary_judge": primary,
     }
 
     p = ROOT / "data/report.json"

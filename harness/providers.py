@@ -47,6 +47,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -246,6 +247,13 @@ class GeminiJudgeClient:
                 retry_options=genai.types.HttpRetryOptions(attempts=4),
             ),
         )
+        # Real token counters, so a second-judge run reports an invoice, not an
+        # estimate. Gemini bills thinking tokens as output, so both candidate and
+        # thought tokens are summed into "output" (matching the sticker-vs-real
+        # gap the runbook warns about for reasoning judges). Locked because a
+        # concurrent add_judge run updates these from several worker threads.
+        self.usage = {"input": 0, "output": 0, "calls": 0}
+        self._ulock = threading.Lock()
         self.messages = _messages_namespace(self._create)
 
     def _create(self, *, model=None, max_tokens=None, temperature=None,
@@ -259,11 +267,31 @@ class GeminiJudgeClient:
         cfg = self._genai.types.GenerateContentConfig(
             system_instruction=system,
             temperature=temperature if temperature is not None else 0.0,
-            max_output_tokens=max((max_tokens or 1200), 4000),
+            max_output_tokens=max((max_tokens or 1200), 8000),
+            # The judge does EXTRACTION, not reasoning ("which of these considerations
+            # appear, is there a challenge"), so a heavy thinking phase buys little and
+            # costs a lot: Gemini bills thinking tokens as OUTPUT, and on the default
+            # setting thinking was ~1,900 of ~2,170 output tokens/call. This Pro model
+            # REJECTS thinking_budget=0 ("only works in thinking mode"), so we turn it
+            # DOWN, not off (thinking_level="low" ~= 650 thinking tokens, valid JSON).
+            # The 8000-token cap gives the JSON room after the (smaller) thinking phase,
+            # which also removes the MAX_TOKENS mid-key truncation seen at the 4000 cap.
+            thinking_config=self._genai.types.ThinkingConfig(thinking_level="low"),
         )
         resp = self._client.models.generate_content(
             model=model or self.model, contents=user_text, config=cfg)
-        return _Resp(content=[_Block(text=resp.text or "")])
+        um = getattr(resp, "usage_metadata", None)
+        in_tok = (getattr(um, "prompt_token_count", 0) or 0) if um is not None else 0
+        out_tok = (((getattr(um, "candidates_token_count", 0) or 0)
+                    + (getattr(um, "thoughts_token_count", 0) or 0))
+                   if um is not None else 0)
+        with self._ulock:
+            self.usage["input"] += in_tok
+            self.usage["output"] += out_tok
+            self.usage["calls"] += 1
+            snap = (self.usage["input"], self.usage["output"])
+        return _Resp(content=[_Block(text=resp.text or "")],
+                     usage=_Usage(input_tokens=snap[0], output_tokens=snap[1]))
 
 
 class OpenAIJudgeClient:
@@ -297,6 +325,8 @@ class OpenAIJudgeClient:
         # against openai-python 2.51.0 (Context7 + local signature check).
         self._client = OpenAI(api_key=api_key or os.environ.get("OPENAI_API_KEY"),
                               timeout=180.0, max_retries=4)
+        self.usage = {"input": 0, "output": 0, "calls": 0}
+        self._ulock = threading.Lock()
         self.messages = _messages_namespace(self._create)
 
     def _create(self, *, model=None, max_tokens=None, temperature=None,
@@ -318,7 +348,16 @@ class OpenAIJudgeClient:
             kwargs["temperature"] = temperature if temperature is not None else 0.0
             kwargs["max_tokens"] = max_tokens or 1200
         resp = self._client.chat.completions.create(**kwargs)
-        return _Resp(content=[_Block(text=resp.choices[0].message.content)])
+        u = getattr(resp, "usage", None)
+        in_tok = (getattr(u, "prompt_tokens", 0) or 0) if u is not None else 0
+        out_tok = (getattr(u, "completion_tokens", 0) or 0) if u is not None else 0
+        with self._ulock:
+            self.usage["input"] += in_tok
+            self.usage["output"] += out_tok
+            self.usage["calls"] += 1
+            snap = (self.usage["input"], self.usage["output"])
+        return _Resp(content=[_Block(text=resp.choices[0].message.content)],
+                     usage=_Usage(input_tokens=snap[0], output_tokens=snap[1]))
 
 
 # ===========================================================================
