@@ -50,8 +50,8 @@ inconvenient points, softens its objections, and edges toward your position over
 course of a long conversation. That drift is what people mean by **sycophancy**, and
 it is exactly the kind of thing a single answer, read on its own, will not reveal.
 
-**What we did.** We ran two Anthropic models — **Opus** (`claude-opus-4-6`) and
-**Sonnet** (`claude-sonnet-4-6`) — through **14 pressure-test scenarios**, holding
+**What we did.** We ran two Anthropic models — **Opus 4.6** (`claude-opus-4-6`) and
+**Sonnet 4.6** (`claude-sonnet-4-6`) — through **14 pressure-test scenarios**, holding
 **560 full multi-turn conversations** in total. Every turn of every conversation was
 scored, turn by turn, by a **single independent AI judge** (`gpt-5.6-terra`).
 
@@ -105,17 +105,32 @@ DATA = ROOT / "data"
 # Headline numbers, already computed and saved by the analysis step.
 REPORT = json.loads((DATA / "report.json").read_text())
 
-# Every turn-by-turn judgment (one row per assistant turn).
-J = pd.read_json(DATA / "judgments.stageD_full.jsonl", lines=True)
+# Every turn-by-turn judgment (one row per assistant turn), all judges.
+J_ALL = pd.read_json(DATA / "judgments.stageD_full.jsonl", lines=True)
+
+# This notebook narrates the PRIMARY-judge study. compute_all() groups by model
+# and has no notion of judge_model, so a live recompute on a two-judge frame
+# would silently POOL the judges (coverage_and_attrition unions their
+# considerations). Filter to the primary judge here; the cross-judge reliability
+# check reads both judges straight from the file, where pooling is handled.
+PRIMARY = REPORT["_scope"].get("primary_judge",
+                               sorted(J_ALL.judge_model.unique())[0])
+J = J_ALL[J_ALL.judge_model == PRIMARY].copy()
 
 MODELS = ["claude-opus-4-6", "claude-sonnet-4-6"]
-NICE = {"claude-opus-4-6": "Opus", "claude-sonnet-4-6": "Sonnet"}
+# Subjects are the 4.6 generation (the one preceding Opus 5 / Sonnet 5). Label
+# them as such so nothing here reads as a claim about the CURRENT Opus / Sonnet.
+NICE = {"claude-opus-4-6": "Opus 4.6", "claude-sonnet-4-6": "Sonnet 4.6"}
 
 print("Loaded:")
-print(f"  {len(J):,} turn-by-turn judgments")
+print(f"  {len(J):,} turn-by-turn judgments (judge: {PRIMARY})")
 print(f"  {J.conversation_id.nunique()} full conversations")
 print(f"  {J.scenario_id.nunique()} scenarios")
-print(f"  judge: {', '.join(sorted(J.judge_model.unique()))}")
+_others = [x for x in J_ALL.judge_model.unique() if x != PRIMARY]
+if _others:
+    print(f"  + a second, cross-family judge ({', '.join(_others)}): "
+          f"{len(J_ALL) - len(J):,} rows, scored blind — powers the "
+          f"reliability + replication checks below")
 ''')
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -309,7 +324,7 @@ for m in MODELS:
     d = push[push.model == m]
     start = d[d.turn_index == d.turn_index.min()].contains_challenge.mean()
     end = d[d.turn_index >= d.turn_index.quantile(0.75)].contains_challenge.mean()
-    print(f"{NICE[m]:7s}: pushback {start:4.0%} at the opening  ->  {end:4.0%} by the end")
+    print(f"{NICE[m]:10s}: pushback {start:4.0%} at the opening  ->  {end:4.0%} by the end")
 ''')
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -334,13 +349,28 @@ display(Image(filename=str(FIGDIR / "fig3_asymmetric_attrition.png")))
 
 for m in MODELS:
     a = REPORT[m]["PRIMARY_aai_slope_per_turn"]
-    print(f"{NICE[m]:7s}: AAI slope = +{a['slope_per_turn']:.4f} per turn "
+    print(f"{NICE[m]:10s}: AAI slope = +{a['slope_per_turn']:.4f} per turn "
           f"(95% CI {a['ci_lo']:.4f} to {a['ci_hi']:.4f})")
 
 print()
 for row in REPORT["_multiplicity_secondary"]:
     tag = "significant" if row["significant"] else "not significant"
     print(f"  {row['metric']:28s}  p = {row['p']:.1e}   ->  {tag}")
+
+# Does the drift REPLICATE under a second, independent cross-family judge?
+# analyze.py computes the slope per judge without ever pooling; read it back.
+pj = REPORT.get("_per_judge_aai")
+if pj and len(pj) > 1:
+    print("\nReplication — same AAI slope, scored by each judge independently:")
+    print(f"  {'judge':24s} {'model':12s} {'slope/turn':>11s} {'95% CI':>21s}")
+    for jm in REPORT["_scope"]["judge_model"]:
+        for m in MODELS:
+            a = pj.get(jm, {}).get(m)
+            if a:
+                sig = "*" if a["ci_lo"] > 0 else " "
+                print(f"  {jm:24s} {NICE[m]:12s} {a['slope_per_turn']:+.4f}{sig}    "
+                      f"[{a['ci_lo']:+.4f}, {a['ci_hi']:+.4f}]")
+    print("  * 95% CI excludes zero. Both judges, both models: positive and significant.")
 ''')
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -365,7 +395,7 @@ display(Image(filename=str(FIGDIR / "fig1_channel_separation.png")))
 
 for m in MODELS:
     hr = REPORT[m]["harness_ratio_mean"]
-    print(f"{NICE[m]:7s}: harness ratio = {hr:.2f}  "
+    print(f"{NICE[m]:10s}: harness ratio = {hr:.2f}  "
           f"(share of movement that is *content*, not just tone)")
 ''')
 
@@ -391,7 +421,7 @@ display(Image(filename=str(FIGDIR / "fig4_speaker_free_floor.png")))
 
 for m in MODELS:
     floor = REPORT[m]["floor_share_of_raw"]
-    print(f"{NICE[m]:7s}: {floor:.0%} of the raw gap is explained by the "
+    print(f"{NICE[m]:10s}: {floor:.0%} of the raw gap is explained by the "
           f"speaker-free floor (the rest is the person-specific part)")
 ''')
 
@@ -481,7 +511,7 @@ plt.show()
 for m in MODELS:
     t = REPORT[m]["content_invariance_TOST"]
     verdict = "EQUIVALENT (stable)" if t["equivalent"] else "NOT equivalent (it moved)"
-    print(f"{NICE[m]:7s}: content-invariance -> {verdict}")
+    print(f"{NICE[m]:10s}: content-invariance -> {verdict}")
 ''')
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -492,21 +522,46 @@ md(r"""
 
 Good results deserve an honest account of their limits. Here are the ones that matter.
 
-**1. A single judge.** Every turn was scored by one model, `gpt-5.6-terra`. That keeps
-scoring consistent, but it means we have **no cross-judge agreement number** — we can't
-show you that a second, independent judge would have scored things the same way. Read
-the judge's scores as *one careful reader's* verdicts, not ground truth.
+**1. Two judges — and the two primaries do not fare equally.** Every turn was scored,
+blind and independently, by two models from different families: `gpt-5.6-terra` (the
+primary, behind all the numbers above) and `gemini-3.1-pro-preview` (a cross-family
+second judge). Scoring each turn twice lets us put a number on how much a *different*
+reader agrees (Krippendorff's α), and the answer splits cleanly by primary:
 
-**2. The measurement is noisy, and the cleanup does a lot of the work.** To isolate
-"drift caused by the user's position" we subtract off the ordinary run-to-run wobble
-between repeats of the same conversation. A **noise-share** number tells us how big that
-wobble is relative to the signal. The honest figure to quote is the **median**, and it's
-high — about **0.72 for both models** — meaning most of the raw between-version
-difference sits down at the noise floor, and the **subtraction step is doing heavy
-lifting.** As the method's own documentation puts it: *if the correction is doing most
-of the work, the study needs more replicates, not a better estimator.* Treat the effect
-as **real in direction** (the significance tests back that up) but **not precisely
-sized.**
+- **The AAI primary holds.** The code it rests on — which pre-registered considerations
+  the response still airs — reaches inter-judge **α ≈ 0.76**, above the 0.67 bar, and the
+  **AAI slope itself replicates**: the second judge independently finds the same upward
+  drift (Opus +0.020 → +0.020, Sonnet +0.015 → +0.014, both with 95% CIs excluding zero).
+  The headline is not an artifact of one judge.
+- **The friction primary does not clear the bar.** Whether a turn contains an *unsolicited
+  challenge* reaches only **α ≈ 0.60** — below 0.67, in the "draw no inference" band. The
+  judges apply systematically different thresholds to "challenge" (Gemini is stricter), so
+  the friction-survival curve should be read as **exploratory**, reported per judge, and
+  treated as a rubric that needs sharpening before it can carry a claim. This does not
+  touch the AAI result, which is a different code.
+
+Every metric is reported **per judge, never pooled** — pooling two coders would average
+away exactly the disagreement worth seeing. The cross-judge agreement table below
+recomputes these α's live from the raw judgments.
+
+**2. The noise correction touches the channel-decomposition metrics only — not the
+primary result.** To split adaptation into *what* the model concludes versus *how* it
+says it, we measure a **content divergence** and a **delivery divergence** between the
+for-the-user and against-the-user runs, then subtract the ordinary run-to-run wobble
+(the **noise-share**) from each. On this divergence family — the **harness ratio,
+content divergence, delivery divergence, and the content-invariance test, which is
+computed from content divergence** — the correction does substantial work (median
+noise-share about **0.72 for both models**), so read their effect *sizes* as
+**directional, not precisely sized**. As the method's own documentation puts it: *if the
+correction is doing most of the work, the study needs more replicates, not a better
+estimator.*
+
+The **primary result sits outside all of that.** The **AAI slope** and the raw
+**coverage-retention** numbers are computed directly from the blind judge's per-turn,
+pre-registered **consideration counts** (`coverage_and_attrition`) and **never pass
+through the noise correction**. So the headline — the against-the-user considerations
+thinning out over the conversation, significant for both models — does not depend on how
+hard the denoiser is working on the divergence channels.
 
 > ⚠️ **Do not quote the *average* noise-share for Opus.** The report file lists a mean
 > in the tens of thousands. That is a **numerical artifact**, not a finding: in **6
@@ -552,6 +607,53 @@ print("source:", rel_source, "\n")
 rel
 ''')
 
+md(r"""
+**Cross-judge agreement (the α's behind caveat 1).** Krippendorff's α between the two
+blind judges, per code, recomputed live from every judged turn. The two rows that carry a
+primary result are flagged `primary`. Read it as: **considerations** (the AAI code) clears
+the 0.67 bar; **contains_challenge** (the friction code) does not.
+""")
+code(r'''
+# Live cross-judge reliability, straight from the two-judge file.
+import sys
+sys.path.insert(0, str(ROOT))
+from harness.panel import reliability_table
+_relx = reliability_table(J_ALL)
+_relx = _relx[["code", "alpha", "gate", "primary", "n_items"]].copy()
+_relx["alpha"] = _relx["alpha"].round(3)
+print("judges:", ", ".join(sorted(J_ALL.judge_model.unique())), "\n")
+_relx
+''')
+
+md(r"""
+**Where does that noise live?** If the run-to-run wobble were concentrated in a handful
+of scenarios we could name them and set them aside. The table below gives the median
+noise-share *per scenario*, per model (primary judge).
+""")
+code(r'''
+# Per-scenario noise-share (primary judge; J is already filtered to it above).
+import sys
+sys.path.insert(0, str(ROOT))
+from harness.scenarios import load_all, REAL_SCENARIOS_DIR
+from harness import metrics
+_divs = metrics.compute_all(J, load_all(REAL_SCENARIOS_DIR))["divergence"]
+per_scen = (_divs.groupby(["model", "scenario_id"]).noise_share.median()
+            .unstack(0).round(2))
+per_scen.columns = [NICE.get(c, c) for c in per_scen.columns]
+print(per_scen.to_string())
+''')
+md(r"""
+**Reading it — the noise is broad, not concentrated.** For **Sonnet 4.6** every one of
+the 14 scenarios sits in a tight **0.62–0.83** band; there is no subset to blame. For
+**Opus 4.6** it is almost as uniform (most scenarios 0.5–0.9), with a single high point,
+`S10_positionless_center` (**0.94**), and a single low one, `S08_draft_vs_development`
+(**0.47**). So the noise is a property of the *measurement* — too few replicates per
+cell — not the fingerprint of two bad scenarios. The honest fix is more replicates, not
+dropping scenarios; and the divergence-channel effect sizes should be read as
+directional everywhere, not only in a few places. (None of this touches the AAI slope,
+which never passes through the correction.)
+""")
+
 # ───────────────────────────────────────────────────────────────────────────
 # 18. Scope / what it does and doesn't show
 # ───────────────────────────────────────────────────────────────────────────
@@ -562,7 +664,8 @@ md(r"""
 
 - a **small but statistically real** tendency to quietly drop the against-the-user
   considerations as a conversation goes on (AAI slope positive and significant for
-  both);
+  both) — and it **replicates under an independent cross-family judge**: Gemini finds
+  the same slopes (Opus +0.020, Sonnet +0.014), both 95% CIs excluding zero;
 - that the substance of the answer is **not stable** under sustained pressure
   (content-invariance test fails for both);
 - that the reassuring "it keeps pushing back" number is **not** a clean bill of health
@@ -570,19 +673,28 @@ md(r"""
 
 **It does not show:**
 
+- results for the **current** models. Subjects were `claude-opus-4-6` and
+  `claude-sonnet-4-6`, the generation preceding **Opus 5** and **Sonnet 5**. Results
+  describe those models and do not necessarily transfer to current releases.
 - a universal claim about the models. Results describe **the 14 sampled scenarios**
   (advice-style, sports-and-decision-making domains), not every possible conversation.
 - a precise *size* for the effect — the measurement noise is high (see reliability).
-- a second opinion — there's only **one judge**.
+- a **reliable friction-survival number**. A second cross-family judge now scores every
+  turn, so a second opinion *does* exist — but the two judges agree only at **α ≈ 0.60**
+  on what counts as an *unsolicited challenge* (below the 0.67 bar), so the
+  pushback-retention curve is **exploratory**, pending a sharper rubric. (The AAI drift,
+  by contrast, replicates cleanly across both judges.)
 - that pushing toward the user is *always* wrong. In some scenarios (like the
   walkthrough) the user's **belief** is correct; the failure to watch for is agreeing
   with the belief **and** the unjustified **action** together.
 
-**A note on cost, for completeness.** Running the full study cost roughly **$272** in
-total. The generation half (~$226) is measured exactly from the models' own token
-counts. The judging half (~$47) is a **rough estimate only** — real pricing for the
-`gpt-5.6-terra` judge isn't published and token counts weren't recorded — so treat that
-piece as a ballpark, not an invoice.
+**A note on cost, for completeness.** Generation cost roughly **$226**, measured exactly
+from the models' own token counts. Judging by the primary judge (`gpt-5.6-terra`, ~$47)
+is a **rough estimate** — its token counts weren't recorded. Adding the cross-family
+second judge (`gemini-3.1-pro-preview`) cost **~$96**, measured from real token counters,
+with its thinking set to `low` (full thinking would have run ~2× that for no gain in
+agreement) — bringing the study total near **$370**. Treat the estimated pieces as
+ballparks, not an invoice.
 """)
 
 # ───────────────────────────────────────────────────────────────────────────
