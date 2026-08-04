@@ -293,14 +293,41 @@ drift across all 560 conversations instead of trusting a single read.
 md(r"""
 ## 1. Why one number misses it  *(Figure 7)*
 
-The most natural way to check for sycophancy is to count **flips**: did the assistant
-reverse its answer? By that measure, both models look almost spotless — there are
-barely any outright reversals (left panel). But the *same conversations*, looked at
-through **whether pushback fades and which considerations get dropped**, tell a
-different story (right panel). **The flip count is the wrong instrument** — it's
-looking for a slammed door when the actual movement is a slow leak.
+The obvious test for sycophancy is to count **flips** — did the assistant *reverse* its
+answer? Two things make that the wrong instrument. It looks for a **slammed door when the
+real movement is a slow leak**: a model can hold its stated side for the whole
+conversation while quietly draining the substance out of it. And "did it flip" rests on
+the **least reliable** part of the coding — the recommendation label, where our two
+judges agree only at **α ≈ 0.45**; a claim built on it is built on sand.
+
+The **reliable** read is the **stance trajectory**, and stance is the single most
+agreed-on code between the two judges (**α ≈ 0.87**). Oriented so **+1 = fully agrees with
+the user** and **−1 = argues against them**, the pattern is the same for both models and
+both judges: the assistant **starts clearly resisting the user (≈ −0.25) and converges to
+approximately neutral (≈ +0.04) by the end** — a large drift toward the user that **stops
+at the neutral line and never swings to genuine endorsement**. That is exactly the
+movement a flip count is blind to. (The AAI slope, next, measures the same drift a second
+way — through which considerations quietly get dropped.)
 """)
-code(r'display(Image(filename=str(FIGDIR / "fig7_flip_blindspot.png")))')
+code(r'''
+display(Image(filename=str(FIGDIR / "fig7_flip_blindspot.png")))
+
+# Stance trajectory, user-oriented (+1 = agrees with the user, -1 = resists),
+# early turns vs late turns, per model AND per judge. Stance is the most reliable
+# code (α≈0.87), so this claim does not rest on the shaky flip/recommendation coding.
+import numpy as np
+_pj = J_ALL[J_ALL.arm.isin(["pro", "con"])].copy()
+_pj["ustance"] = np.where(_pj.arm == "con", -_pj.stance, _pj.stance)
+print(f"{'judge':24s} {'model':11s} {'early(Q1)':>9s} {'late(Q4)':>9s} {'move':>7s}")
+for jm in REPORT["_scope"]["judge_model"]:
+    for m in MODELS:
+        d = _pj[(_pj.judge_model == jm) & (_pj.model == m)]
+        e = d[d.turn_index <= d.turn_index.quantile(.25)].ustance.mean()
+        l = d[d.turn_index >= d.turn_index.quantile(.75)].ustance.mean()
+        print(f"{jm:24s} {NICE[m]:11s} {e:>+9.3f} {l:>+9.3f} {l - e:>+7.3f}")
+print("\nEvery row: starts clearly negative (resisting) -> ends ≈0 (neutral),"
+      "\nnever near +1. A big move toward the user that stops at the line.")
+''')
 
 # ───────────────────────────────────────────────────────────────────────────
 # 10. Fig2 — friction survival
@@ -325,6 +352,35 @@ for m in MODELS:
     start = d[d.turn_index == d.turn_index.min()].contains_challenge.mean()
     end = d[d.turn_index >= d.turn_index.quantile(0.75)].contains_challenge.mean()
     print(f"{NICE[m]:10s}: pushback {start:4.0%} at the opening  ->  {end:4.0%} by the end")
+''')
+
+md(r"""
+> **How much to trust this pushback number.** Whether a turn contains an *unsolicited
+> challenge* is the one primary code the two judges do **not** agree on well — cross-judge
+> **α ≈ 0.60**, below the 0.67 bar (they apply systematically different thresholds to
+> "challenge"; the stricter judge fires ~11 points less often). So read the friction curve
+> as a **direction, not a level**: the exact percentages are judge-dependent, but the
+> *shape* is not. Both judges independently produce the **same-signed trajectory** for both
+> models (table below), which is the defence the finding actually rests on — reported per
+> judge, never pooled. The exact α and the full agreement table are in the reliability
+> section.
+""")
+code(r'''
+# The per-turn label disagrees, but the DIRECTION is judge-robust: same sign in
+# every cell. That is what carries the friction finding, not the raw percentages.
+import numpy as np
+_p = J_ALL[J_ALL.arm.isin(["pro", "con"])]
+_js = REPORT["_scope"]["judge_model"]
+print(f"{'model':11s} {'code':20s} " + "".join(f"{jm[:18]:>19s}" for jm in _js) + "   agree?")
+for m in MODELS:
+    for code in ["contains_challenge", "challenge_strength"]:
+        slopes = []
+        for jm in _js:
+            d = _p[(_p.judge_model == jm) & (_p.model == m)].dropna(subset=[code, "turn_index"])
+            slopes.append(float(np.polyfit(d.turn_index, d[code].astype(float), 1)[0]))
+        agree = "yes" if len({np.sign(s) for s in slopes}) == 1 else "NO"
+        print(f"{NICE[m]:11s} {code:20s} " + "".join(f"{s:>+19.4f}" for s in slopes) + f"   {agree}")
+print("\nSame sign in every row: the trajectory replicates across judges; the level does not.")
 ''')
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -615,13 +671,29 @@ the 0.67 bar; **contains_challenge** (the friction code) does not.
 """)
 code(r'''
 # Live cross-judge reliability, straight from the two-judge file.
-import sys
+import sys, numpy as np
 sys.path.insert(0, str(ROOT))
 from harness.panel import reliability_table
 _relx = reliability_table(J_ALL)
 _relx = _relx[["code", "alpha", "gate", "primary", "n_items"]].copy()
 _relx["alpha"] = _relx["alpha"].round(3)
-print("judges:", ", ".join(sorted(J_ALL.judge_model.unique())), "\n")
+print("judges:", ", ".join(sorted(J_ALL.judge_model.unique())))
+
+# Considerations agreement, a second way: mean Jaccard of the two judges' detected
+# sets per turn — a complement to the α above. Undefined when both judges flag
+# nothing, so those turns are excluded.
+_ky = ["run_key", "turn_index"]
+_gj = sorted(J_ALL.judge_model.unique())
+_a = J_ALL[J_ALL.judge_model == _gj[0]].set_index(_ky).considerations_present
+_b = J_ALL[J_ALL.judge_model == _gj[1]].set_index(_ky).considerations_present
+_common = _a.index.intersection(_b.index)
+def _jac(x, y):
+    x = set(x if isinstance(x, (list, tuple)) else [])
+    y = set(y if isinstance(y, (list, tuple)) else [])
+    return np.nan if not x and not y else len(x & y) / len(x | y)
+_jv = np.array([_jac(_a.loc[i], _b.loc[i]) for i in _common], dtype=float)
+print(f"considerations_present — mean Jaccard {np.nanmean(_jv):.3f} "
+      f"(over {int((~np.isnan(_jv)).sum()):,} turns where >=1 judge flagged something)\n")
 _relx
 ''')
 
