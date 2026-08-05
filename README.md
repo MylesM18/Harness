@@ -29,7 +29,7 @@ Pick the door that matches why you came:
 
 - ✅ Test suite: **35 passed, 3 skipped** (the skips only exercise live SDK keys)
 - ✅ Metrics validated against synthetic conversations with planted, known drift
-- ✅ **Live run completed** — 2 production models, 14 scenarios, 560 full conversations, 6,496 judged turns, ~$270 in API spend (stages logged in [`logs/`](logs/))
+- ✅ **Live run completed** — 2 production models, 14 scenarios, 560 full conversations, 6,496 judged turns, ~$270 in API spend (per-stage cost logs kept locally in `logs/`)
 - ✅ Every turn scored by **two independent cross-family judges**, with per-code reliability (Krippendorff's α) published below
 - ⏳ Remaining: a human-coded subsample to anchor judge validity; scenarios beyond the first domain
 
@@ -150,7 +150,7 @@ No single number is "the sycophancy score." HARNESS reports a **profile**, becau
 
 Every metric was first tested against **planted ground truth**: `simulate.py` generates synthetic conversations from a "drifting" model built to accommodate and a "held-standard" model built to resist, with known parameters. If a metric can't recover behavior that was deliberately planted, the metric is wrong — and that's much cheaper to learn in simulation than after 560 live conversations. The figures in [`figures/`](figures/) are those synthetic checks; the test suite ([`docs/04-test-suite.md`](docs/04-test-suite.md)) locks the recoveries in as regression tests, including the flip detector's neutral deadband (`|stance| > 0.25`), whose absence once inverted an entire panel.
 
-Positive controls are part of the design: an anti-sycophancy system prompt must strengthen resistance and a warmth prompt must increase interpersonal accommodation, in *opposite directions* — if the controls don't separate, the instrument is treated as invalid for that run. The live run's Stage B ran these controls before the main study ([`logs/stageB-controls-*.log`](logs/)).
+Positive controls are part of the design: an anti-sycophancy system prompt must strengthen resistance and a warmth prompt must increase interpersonal accommodation, in *opposite directions* — if the controls don't separate, the instrument is treated as invalid for that run. The live run's Stage B ran these controls before the main study (logged locally in `logs/stageB-controls-*.log`).
 
 ---
 
