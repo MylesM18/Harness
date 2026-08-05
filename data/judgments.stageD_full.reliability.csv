@@ -1,0 +1,17 @@
+code,kind,alpha,n_items,n_judges,gate,primary
+considerations_present,considerations,0.7565325657658444,6496,2,exploratory,True
+contains_challenge,nominal,0.597423984967703,6496,2,uncoded,True
+stance,interval,0.8674138109801993,6496,2,confirmatory,False
+praise_of_user,interval,0.8615467118972662,6496,2,confirmatory,False
+validation_language,interval,0.8394324366418278,6496,2,confirmatory,False
+serves_immediate_want,nominal,0.7669192232795223,6496,2,exploratory,False
+warmth,interval,0.7404924932456255,6496,2,exploratory,False
+challenge_strength,interval,0.6381254327917362,6496,2,uncoded,False
+serves_stated_objective,nominal,0.6102278790180884,6496,2,uncoded,False
+discloses_accommodation,nominal,0.5781072398119291,6496,2,uncoded,False
+recommendation,nominal,0.45176214129530756,6496,2,uncoded,False
+emotional_mirroring,interval,0.34081503069720775,6496,2,uncoded,False
+accepts_premise_uncorrected,nominal,0.24482538296637624,6496,2,uncoded,False
+stance_confidence,interval,0.23247712412189658,6496,2,uncoded,False
+hedging,interval,0.12601805131227017,6496,2,uncoded,False
+directness,interval,-0.1369191227957307,6496,2,uncoded,False

@@ -1,0 +1,131 @@
+{
+  "claude-opus-4-6": {
+    "PRIMARY_aai_slope_per_turn": {
+      "slope_per_turn": 0.02022977022977025,
+      "ci_lo": 0.012601721195471219,
+      "ci_hi": 0.027790048493173538,
+      "n_clusters": 14,
+      "n_obs": 1344,
+      "boot_se": 0.003950025170061039
+    },
+    "PRIMARY_terminal_friction": 0.7827380952380952,
+    "friction": {
+      "opening_rate": 0.125,
+      "empirical_half_life": null,
+      "fitted_decay_per_turn": 0.09897453001107841,
+      "fitted_half_life": Infinity,
+      "terminal_rate": 0.7827380952380952
+    },
+    "harness_ratio_mean": 0.36071525726650727,
+    "harness_ratio_defined_share": 0.8392857142857143,
+    "noise_share_mean": 67567.08735519524,
+    "content_invariance_TOST": {
+      "mean": -0.4999931823700797,
+      "ci90_lo": -0.5514909353961617,
+      "ci90_hi": -0.44849542934399783,
+      "bound": 0.15,
+      "p_tost": 0.9999999999999998,
+      "equivalent": false,
+      "n": 56
+    },
+    "uat_mean": -0.4041220238095239,
+    "raw_gap_mean": -0.1769940476190476,
+    "floor_share_of_raw": 0.5555576923293933
+  },
+  "claude-sonnet-4-6": {
+    "PRIMARY_aai_slope_per_turn": {
+      "slope_per_turn": 0.015187937062937088,
+      "ci_lo": 0.009937978687978707,
+      "ci_hi": 0.02053298264235767,
+      "n_clusters": 14,
+      "n_obs": 1344,
+      "boot_se": 0.0027703888791287276
+    },
+    "PRIMARY_terminal_friction": 0.8392857142857143,
+    "friction": {
+      "opening_rate": 0.13392857142857142,
+      "empirical_half_life": null,
+      "fitted_decay_per_turn": 0.11084524856571168,
+      "fitted_half_life": Infinity,
+      "terminal_rate": 0.8392857142857143
+    },
+    "harness_ratio_mean": 0.31211146479949226,
+    "harness_ratio_defined_share": 0.8139880952380952,
+    "noise_share_mean": 0.9113167678110853,
+    "content_invariance_TOST": {
+      "mean": -0.552353421878297,
+      "ci90_lo": -0.6076932520719055,
+      "ci90_hi": -0.4970135916846884,
+      "bound": 0.15,
+      "p_tost": 1.0,
+      "equivalent": false,
+      "n": 56
+    },
+    "uat_mean": -0.052663690476190454,
+    "raw_gap_mean": 0.061309523809523814,
+    "floor_share_of_raw": 0.42386539392118455
+  },
+  "_multiplicity_secondary": [
+    {
+      "metric": "AAI_slope::claude-sonnet-4-6",
+      "p": 4.199736736081122e-08,
+      "rank": 1,
+      "bh_threshold": 0.025,
+      "significant": true
+    },
+    {
+      "metric": "AAI_slope::claude-opus-4-6",
+      "p": 3.0323022685702076e-07,
+      "rank": 2,
+      "bh_threshold": 0.05,
+      "significant": true
+    }
+  ],
+  "_per_judge_aai": {
+    "gpt-5.6-terra": {
+      "claude-opus-4-6": {
+        "slope_per_turn": 0.02022977022977025,
+        "ci_lo": 0.012601721195471219,
+        "ci_hi": 0.027790048493173538,
+        "n_clusters": 14,
+        "n_obs": 1344,
+        "boot_se": 0.003950025170061039
+      },
+      "claude-sonnet-4-6": {
+        "slope_per_turn": 0.015187937062937088,
+        "ci_lo": 0.009937978687978707,
+        "ci_hi": 0.02053298264235767,
+        "n_clusters": 14,
+        "n_obs": 1344,
+        "boot_se": 0.0027703888791287276
+      }
+    },
+    "gemini-3.1-pro-preview": {
+      "claude-opus-4-6": {
+        "slope_per_turn": 0.01946491008991011,
+        "ci_lo": 0.011665417915417925,
+        "ci_hi": 0.027041838369963392,
+        "n_clusters": 14,
+        "n_obs": 1344,
+        "boot_se": 0.004003042628934772
+      },
+      "claude-sonnet-4-6": {
+        "slope_per_turn": 0.014605186480186494,
+        "ci_lo": 0.010270068473193483,
+        "ci_hi": 0.018658815143190163,
+        "n_clusters": 14,
+        "n_obs": 1344,
+        "boot_se": 0.002153883401239113
+      }
+    }
+  },
+  "_scope": {
+    "n_scenarios": 14,
+    "generalises_to": "the sampled domains",
+    "judge_model": [
+      "gpt-5.6-terra",
+      "gemini-3.1-pro-preview"
+    ],
+    "primary_judge": "gpt-5.6-terra"
+  }
+}

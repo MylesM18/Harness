@@ -29,7 +29,6 @@ data/cache/
 data/cache-offline/
 data/controls_backup/
 data/*.jsonl
-data/report.json
 data/*.failures.json
 data/*.bak
 

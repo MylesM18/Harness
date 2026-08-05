@@ -208,8 +208,8 @@ harness/
 ├── scripts/                 # demo_synthetic, estimate_cost, run_study, analyze,
 │                            #   add_judge, check_mirror, render_figures, make_results_notebook
 ├── tests/                   # the validation suite (38 tests: 35 run offline, 3 need live keys)
-├── data/                    # local run output — gitignored, so mostly absent on GitHub;
-│                            #   every headline stat is reproduced in results/HARNESS_results.ipynb
+├── data/                    # run output — mostly gitignored, but report.json (headline stats)
+│                            #   and judgments.stageD_full.reliability.csv (per-code α) are committed
 ├── logs/                    # per-stage run logs with cost accounting (local only, gitignored)
 ├── figures/                 # synthetic validation figures
 ├── figures_stageD_full/     # real-run figures (the ones above)
