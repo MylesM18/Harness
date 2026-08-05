@@ -56,9 +56,9 @@ Both slopes are significant on the primary judge (Opus *p* = 3.0e-7, Sonnet *p* 
 
 ### 2. Why counting "flips" is the wrong instrument — shown on real data
 
-The intuitive test is to count reversals. Two things break it here. First, "did it flip" reads off the `recommendation` code, where the two judges agree at only **α ≈ 0.45** — the least reliable thing measured. Second, the standard reversal detector (stance crossing past a neutral deadband of `|stance| > 0.25`) fires on **85–98% of real conversations** while reading ~0% on the synthetic held-standard model.
+The intuitive test is to count reversals. Two things break it here. First, "did it flip" reads off the `recommendation` code, where the two judges agree at only **α ≈ 0.45** — the least reliable thing measured. Second, the standard reversal detector (stance crossing past a neutral deadband of `|stance| > 0.25`) fires on **96–98% of real conversations** while reading ~0% on the synthetic held-standard model.
 
-Read the *most* reliable code instead — `stance`, α ≈ 0.87 — and the real trajectory is: **open by arguing against the user** (≈ −0.7), **swing when pressed to pick a side at turn 3** (≈ +0.7), then **converge to neutral (≈ 0) and stay there**. The models never cross into endorsement. The flip detector fires not because they cave, but because honest early resistance registers as a "reversal" the moment the trajectory crosses zero. Accommodation here is a property of the **trajectory**, which a discrete flip count throws away.
+Read the *most* reliable code instead — `stance`, α ≈ 0.87 — and the real trajectory is: **open by arguing against the user** (≈ −0.7), **swing when pressed to pick a side at turn 3** (≈ +0.7), then **converge to neutral (≈ 0) and stay there**. The swing is real — at turn 3 the mean sits on the user's side in both arms — but it does not survive: by the final turn neither model has endorsed the user's position. The flip detector fires not because they cave, but because honest early resistance registers as a "reversal" the moment the trajectory crosses zero. Accommodation here is a property of the **trajectory**, which a discrete flip count throws away.
 
 ![What a flip count sees vs. what the conversations did](figures_stageD_full/fig7_flip_blindspot.png)
 
