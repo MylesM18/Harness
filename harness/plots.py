@@ -4,6 +4,24 @@ Figures.
 Each figure answers one question and is designed so the answer is legible
 without the caption. Where a figure could be misread, the misreading is
 annotated on the figure itself rather than left to a footnote nobody reaches.
+
+STYLE IS SET ONCE, HERE, AND NOWHERE ELSE.
+`set_house_style()` installs the whole visual contract - seaborn theme, palette,
+type sizes, despined axes, y-only grid, export dpi. Every figure below calls it
+and then does no styling of its own beyond what the data requires. Anything that
+looks like per-figure taste (a font size, a colour literal, a legend position)
+belongs in this header, not in a figure body; that is the difference between a
+house style and seven figures that happen to resemble each other.
+
+Two conventions the readability of these figures depends on:
+
+1. EVERY SERIES CARRIES THREE ENCODINGS - hue, marker, and linestyle - assigned
+   per model by `series_style()`. Colour alone fails for ~8% of male readers and
+   fails for everyone in greyscale print, which is where half of these end up.
+2. THE KEY STATISTIC IS ON THE PLOT. A figure whose point is "the slope is
+   positive and it is not noise" states the slope, its interval and its p-value
+   inside the axes, so the number and the picture cannot drift apart in a reader's
+   memory.
 """
 
 from __future__ import annotations
@@ -11,59 +29,237 @@ from __future__ import annotations
 from pathlib import Path
 import numpy as np
 import pandas as pd
-import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+from matplotlib.lines import Line2D
+from matplotlib.offsetbox import AnchoredText
+import seaborn as sns
 
 # ---------------------------------------------------------------------------
+# House style - the single source of visual truth
+# ---------------------------------------------------------------------------
 
-INK = "#1B1B1E"
-SLATE = "#6B7280"
-RULE = "#D8D5CE"
-PAPER = "#FAF9F6"
-HOLD = "#2A6F6B"      # the model that holds
-DRIFT = "#B4553F"     # the model that drifts
-FLOOR = "#9AA0A6"     # the speaker-free floor / neutral placebo
-ACCENT = "#8A6FA8"
+PAPER = "#FAF9F6"      # chart surface
+INK = "#1B1B1E"        # primary text
+SLATE = "#5A616D"      # secondary text
+RULE = "#D6D3CC"       # axes, grid
 
-SERIES = [HOLD, DRIFT, ACCENT, "#6E8B3D", "#B08968"]
+# Okabe-Ito. Verified against the CVD checks with #FAF9F6 as the surface: the
+# first three slots pass lightness band, chroma floor, all-pairs deuteranope
+# separation (worst dE 11.0), normal-vision separation (worst 18.7) and 3:1
+# contrast. Slots 4-5 land in the 6-8 dE band, which is legal here only because
+# every series also carries a distinct marker and linestyle (see series_style).
+BLUE = "#0072B2"
+VERMILLION = "#D55E00"
+GREEN = "#009E73"
+MAGENTA = "#CC79A7"
+AMBER = "#E69F00"
+
+SERIES = [BLUE, VERMILLION, GREEN, MAGENTA, AMBER]
+MARKERS = ["o", "s", "^", "D", "v"]
+LINESTYLES = ["-", (0, (5, 1.6)), (0, (1, 1.3)), (0, (6, 1.4, 1, 1.4)), (0, (3, 1.2))]
+
+HOLD = BLUE            # the channel/quantity that should stay put
+DRIFT = VERMILLION     # the channel/quantity that moves
+FLOOR = "#6F7681"      # neutral reference arm - always dashed AND labelled
+ACCENT = MAGENTA
+
+# One export contract for every figure: same canvas, same dpi, same tight box.
+# Uniform width matters more than it sounds - these sit stacked in a README, and
+# a column of images that all snap to the same measure reads as one document.
+FIG_W, FIG_H = 12.0, 5.6
+FIGSIZE = (FIG_W, FIG_H)
+DPI = 200
+
+TITLE_SIZE = 18
+SUB_SIZE = 12.5
+PANEL_TITLE_SIZE = 14
+LABEL_SIZE = 13
+TICK_SIZE = 12
+LEGEND_SIZE = 12
+NOTE_SIZE = 11.5
+
+_STYLED = False
 
 
-def _style():
-    mpl.rcParams.update({
-        "figure.facecolor": PAPER,
-        "axes.facecolor": PAPER,
-        "savefig.facecolor": PAPER,
-        "font.family": "DejaVu Sans",
-        "font.size": 10,
-        "axes.edgecolor": RULE,
-        "axes.linewidth": 0.9,
-        "axes.labelcolor": INK,
-        "axes.titlesize": 12,
-        "axes.titleweight": "bold",
-        "axes.titlecolor": INK,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "xtick.color": SLATE,
-        "ytick.color": SLATE,
-        "grid.color": RULE,
-        "grid.linewidth": 0.6,
-        "legend.frameon": False,
-        "figure.dpi": 130,
-    })
+def set_house_style(force: bool = False) -> None:
+    """Install the house style. Idempotent; call it from every figure."""
+    global _STYLED
+    if _STYLED and not force:
+        return
+    sns.set_theme(
+        context="notebook",
+        style="whitegrid",
+        palette=SERIES,
+        font="DejaVu Sans",
+        rc={
+            "figure.facecolor": PAPER,
+            "axes.facecolor": PAPER,
+            "savefig.facecolor": PAPER,
+            "savefig.dpi": DPI,
+            "figure.dpi": DPI,
+            "font.size": LABEL_SIZE,
+            "axes.edgecolor": RULE,
+            "axes.linewidth": 1.0,
+            "axes.labelcolor": INK,
+            "axes.labelsize": LABEL_SIZE,
+            "axes.titlesize": PANEL_TITLE_SIZE,
+            "axes.titleweight": "bold",
+            "axes.titlecolor": INK,
+            "axes.titlelocation": "left",
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "axes.grid": True,
+            "axes.grid.axis": "y",           # horizontal rules only; x is ordinal
+            "axes.axisbelow": True,
+            "grid.color": RULE,
+            "grid.linewidth": 0.7,
+            "grid.alpha": 0.9,
+            "xtick.color": SLATE,
+            "ytick.color": SLATE,
+            "xtick.labelsize": TICK_SIZE,
+            "ytick.labelsize": TICK_SIZE,
+            "xtick.bottom": True,
+            "legend.frameon": False,
+            "legend.fontsize": LEGEND_SIZE,
+            "lines.linewidth": 2.4,
+            "lines.markersize": 6.0,
+            "lines.markeredgewidth": 0.0,
+        },
+    )
+    _STYLED = True
 
 
-def _finish(ax, title=None, sub=None, xlab=None, ylab=None):
-    if title:
-        ax.set_title(title, loc="left", pad=16 if sub else 8)
+# backwards-compatible alias: older call sites used the private name
+_style = set_house_style
+
+
+# ---------------------------------------------------------------------------
+# Identity: one entity, one look, everywhere
+# ---------------------------------------------------------------------------
+
+# Slot by model family, not by sort position, so that a figure which drops a
+# model does not repaint the survivors. Opus is always blue-circle-solid.
+_FAMILY_SLOT = {"opus": 0, "sonnet": 1, "haiku": 2, "gpt": 3, "gemini": 4}
+
+
+def series_style(models) -> dict[str, dict]:
+    """Map each model to a stable (colour, marker, linestyle) triple."""
+    slots, pending, used = {}, [], set()
+    for m in models:
+        slot = next((s for k, s in _FAMILY_SLOT.items() if k in str(m).lower()), None)
+        if slot is not None and slot not in used:
+            slots[m] = slot
+            used.add(slot)
+        else:
+            pending.append(m)
+    spare = [s for s in range(len(SERIES)) if s not in used]
+    for i, m in enumerate(pending):
+        slots[m] = spare[i] if i < len(spare) else i % len(SERIES)
+    return {
+        m: {"color": SERIES[s % len(SERIES)],
+            "marker": MARKERS[s % len(MARKERS)],
+            "ls": LINESTYLES[s % len(LINESTYLES)]}
+        for m, s in slots.items()
+    }
+
+
+_PRETTY = {"gpt": "GPT", "ai": "AI"}
+
+
+def nice_model(model: str) -> str:
+    """`claude-opus-4-6` -> `Opus 4.6`. Version digits rejoin with a dot."""
+    parts = [p for p in str(model).split("-") if p and p != "claude"]
+    words = [p for p in parts if not p.isdigit()]
+    version = [p for p in parts if p.isdigit()]
+    label = " ".join(_PRETTY.get(w.lower(), w.capitalize()) for w in words)
+    return f"{label} {'.'.join(version)}".strip()
+
+
+# ---------------------------------------------------------------------------
+# Layout helpers
+# ---------------------------------------------------------------------------
+
+def _canvas(n_panels: int = 1, sharey: bool = False, width_ratios=None):
+    set_house_style()
+    gkw = {"width_ratios": width_ratios} if width_ratios else None
+    fig, axes = plt.subplots(1, n_panels, figsize=FIGSIZE, sharey=sharey,
+                             gridspec_kw=gkw)
+    return fig, np.atleast_1d(axes)
+
+
+def _frame(fig, title: str, sub: str = "", handles=None, labels=None,
+           legend_ncol: int = 2, left: float = 0.075, wspace: float = 0.14,
+           panel_titles: bool = False, bottom_extra: float = 0.0):
+    """Title band on top, legend band at the bottom, data in the middle.
+
+    The legend is a FIGURE-level artist in reserved space below the axes. In-axes
+    legends were covering the very lines they identify on several of these
+    figures, and 'move it to the other corner' is not a fix when the data fills
+    both corners at different turn counts.
+
+    Both bands are SIZED, not guessed: the top grows with the number of subtitle
+    lines and again if the panels carry their own titles, the bottom grows with
+    the number of legend rows. Fixed fractions are how the old figures ended up
+    with a panel title printed through a subtitle.
+    """
+    sub_lines = (sub.count("\n") + 1) if sub else 0
+    top = 0.885 - 0.052 * sub_lines - (0.062 if panel_titles else 0.0)
+    rows = int(np.ceil(len(handles) / max(legend_ncol, 1))) if handles else 0
+    bottom = 0.125 + 0.052 * rows + bottom_extra
+    fig.subplots_adjust(left=left, right=0.985, top=top, bottom=bottom, wspace=wspace)
+    fig.text(0.006, 0.985, title, ha="left", va="top",
+             fontsize=TITLE_SIZE, fontweight="bold", color=INK)
     if sub:
-        ax.text(0, 1.02, sub, transform=ax.transAxes, fontsize=8.5,
-                color=SLATE, va="bottom")
+        fig.text(0.006, 0.905, sub, ha="left", va="top",
+                 fontsize=SUB_SIZE, color=SLATE, linespacing=1.5)
+    if handles:
+        fig.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 0.005),
+                   ncol=legend_ncol, frameon=False, fontsize=LEGEND_SIZE,
+                   handlelength=2.8, columnspacing=2.2, labelcolor=INK)
+
+
+def _axis(ax, panel_title=None, xlab=None, ylab=None):
+    if panel_title:
+        ax.set_title(panel_title, pad=8)
     if xlab:
-        ax.set_xlabel(xlab, fontsize=9)
+        ax.set_xlabel(xlab)
     if ylab:
-        ax.set_ylabel(ylab, fontsize=9)
-    ax.grid(axis="y", alpha=0.55)
-    ax.set_axisbelow(True)
+        ax.set_ylabel(ylab)
+    sns.despine(ax=ax, top=True, right=True)
+
+
+def _statbox(ax, text, loc="upper left"):
+    """The number, in the plot, in text ink. Identity stays with the marks."""
+    at = AnchoredText(text, loc=loc, frameon=True, borderpad=0.5, pad=0.42,
+                      prop={"size": NOTE_SIZE, "color": INK, "linespacing": 1.45})
+    at.patch.set(facecolor="#FFFFFF", edgecolor=RULE, alpha=0.92, linewidth=0.9)
+    at.set_zorder(6)
+    ax.add_artist(at)
+    return at
+
+
+def _handle(style, label, lw=2.4, ls=None, marker=None, color=None):
+    return Line2D([], [], color=color or style["color"],
+                  ls=ls if ls is not None else style["ls"],
+                  marker=marker if marker is not None else style["marker"],
+                  markersize=7, lw=lw, label=label)
+
+
+def _save(fig, out) -> Path:
+    p = Path(out)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(p, dpi=DPI, bbox_inches="tight")
+    plt.close(fig)
+    return p
+
+
+# Public aliases. The notebook builds one chart of its own and must reach the same
+# house style rather than re-deriving it - that is the whole point of this module.
+canvas = _canvas
+frame = _frame
+statbox = _statbox
+save = _save
 
 
 def _mean_ci(df, by, val):
@@ -73,19 +269,26 @@ def _mean_ci(df, by, val):
     return g
 
 
-def _panel_header(fig, title, sub, top=0.78):
-    """Figure-level title + subtitle for the multi-panel figures.
+def _endpoints(g, col="mean"):
+    """First and last turn value of an aggregated curve."""
+    g = g.sort_values("turn_index")
+    return float(g[col].iloc[0]), float(g[col].iloc[-1])
 
-    Two panels share one header, so it cannot be an axes title. Hand-placing the
-    two lines with tight coordinates is fragile: too little separation and the
-    title and subtitle collide (which they did). This reserves a fixed band at
-    the top via subplots_adjust and drops both lines into it with guaranteed
-    clearance, independent of panel count.
-    """
-    fig.subplots_adjust(top=top)
-    fig.text(0.005, 0.985, title, ha="left", va="top",
-             fontsize=14, fontweight="bold", color=INK)
-    fig.text(0.005, 0.915, sub, ha="left", va="top", fontsize=9, color=SLATE)
+
+def _metric_label(metric: str) -> str:
+    """`floor_corrected_resistance` -> two readable lines on an x axis."""
+    w = str(metric).replace("_", " ").split()
+    if len(w) <= 1:
+        return w[0].capitalize() if w else ""
+    if len(w) == 2:
+        return f"{w[0].capitalize()}\n{w[1]}"
+    return f"{w[0].capitalize()}-{w[1]}\n{' '.join(w[2:])}"
+
+
+def _fmt_p(p) -> str:
+    if p is None or (isinstance(p, float) and np.isnan(p)):
+        return ""
+    return "p < 0.001" if p < 0.001 else f"p = {p:.3f}"
 
 
 # ---------------------------------------------------------------------------
@@ -109,36 +312,43 @@ def fig_channel_separation(div: pd.DataFrame, out: str | Path) -> Path:
     argues for. A model whose lines climb together is not adapting its approach,
     it is adapting its answer.
     """
-    _style()
     models = sorted(div.model.unique())
-    fig, axes = plt.subplots(1, len(models), figsize=(5.4 * len(models), 4.9),
-                             sharey=True)
-    axes = np.atleast_1d(axes)
+    fig, axes = _canvas(len(models), sharey=True)
+
+    channels = [("delivery_div", HOLD, "o", "-", "Delivery channel (how it argues)"),
+                ("content_div", DRIFT, "s", (0, (5, 1.6)), "Content channel (what it concludes)")]
 
     for ax, m in zip(axes, models):
         d = div[div.model == m]
-        for col, colour, label in [("delivery_div", HOLD, "Delivery channel"),
-                                   ("content_div", DRIFT, "Content channel")]:
+        curves = {}
+        for col, colour, marker, ls, _label in channels:
             g = _mean_ci(d, "turn_index", col)
-            ax.plot(g.turn_index, g["mean"], color=colour, lw=2.2, label=label,
-                    marker="o", ms=3.5)
-            ax.fill_between(g.turn_index, g.lo, g.hi, color=colour, alpha=0.13, lw=0)
+            curves[col] = g
+            ax.plot(g.turn_index, g["mean"], color=colour, ls=ls, marker=marker,
+                    ms=6, lw=2.4, zorder=3)
+            ax.fill_between(g.turn_index, g.lo, g.hi, color=colour, alpha=0.14, lw=0)
 
-        gd = _mean_ci(d, "turn_index", "delivery_div")
-        gc = _mean_ci(d, "turn_index", "content_div")
+        gd, gc = curves["delivery_div"], curves["content_div"]
         ax.fill_between(gd.turn_index, gc["mean"], gd["mean"],
-                        color=SLATE, alpha=0.07, lw=0)
-        _finish(ax, m, xlab="Turn")
-        ax.set_ylim(bottom=0)
+                        color=SLATE, alpha=0.08, lw=0, zorder=1)
+        _axis(ax, nice_model(m), xlab="Conversation turn")
+        ax.set_ylim(bottom=0, top=ax.get_ylim()[1] * 1.18)   # room for the stat box
 
-    axes[0].set_ylabel("Divergence between mirrored arms", fontsize=9)
-    axes[0].legend(loc="upper left", fontsize=8.5)
-    _panel_header(
-        fig, "Where does the model adapt?",
-        "Same conversation run twice, mirrored. Only the side the user takes differs.\n"
-        "Delivery rising is accommodation. Content rising is the standard moving.")
-    p = Path(out); fig.savefig(p, bbox_inches="tight"); plt.close(fig)
-    return p
+        d_last, c_last = _endpoints(gd)[1], _endpoints(gc)[1]
+        _statbox(ax, f"final turn\ndelivery {d_last:.2f} · content {c_last:.2f}\n"
+                     f"separation {d_last - c_last:+.2f}", loc="upper left")
+
+    _axis(axes[0], ylab="Divergence between mirrored arms\n(0 = identical, 1 = opposite)")
+    handles = [Line2D([], [], color=c, ls=ls, marker=mk, ms=7, lw=2.4, label=lab)
+               for _col, c, mk, ls, lab in channels]
+    handles.append(Line2D([], [], color=SLATE, alpha=0.25, lw=10,
+                          label="Separation between the two channels"))
+    _frame(fig, "Where does the model adapt - in how it argues, or in what it concludes?",
+           "Same conversation run twice, mirrored; only the side the user takes differs.\n"
+           "Delivery rising is accommodation. Content rising is the standard moving with the person.",
+           handles, [h.get_label() for h in handles], legend_ncol=3, left=0.10,
+           panel_titles=True)
+    return _save(fig, out)
 
 
 # ---------------------------------------------------------------------------
@@ -161,41 +371,55 @@ def fig_friction_survival(judgments: pd.DataFrame, out: str | Path) -> Path:
     The neutral line is the control. If friction decays there too, the cause is
     conversation length, not the user.
     """
-    _style()
-    fig, ax = plt.subplots(figsize=(8.4, 4.6))
+    models = sorted(judgments.model.unique())
+    style = series_style(models)
+    fig, axes = _canvas(1)
+    ax = axes[0]
 
-    for i, m in enumerate(sorted(judgments.model.unique())):
-        colour = SERIES[i % len(SERIES)]
+    handles, stats_lines = [], []
+    for m in models:
+        st = style[m]
         d = judgments[(judgments.model == m) & (judgments.arm.isin(["pro", "con"]))]
         g = _mean_ci(d, "turn_index", "contains_challenge")
-        ax.plot(g.turn_index, g["mean"], color=colour, lw=2.4,
-                label=f"{m} — under user pressure", marker="o", ms=3.5)
-        ax.fill_between(g.turn_index, g.lo, g.hi, color=colour, alpha=0.12, lw=0)
+        ax.plot(g.turn_index, g["mean"], color=st["color"], ls="-", marker=st["marker"],
+                ms=6, lw=2.6, zorder=3)
+        ax.fill_between(g.turn_index, g.lo, g.hi, color=st["color"], alpha=0.13, lw=0)
+        handles.append(_handle(st, f"{nice_model(m)} — under user pressure", ls="-"))
+
+        first, last = _endpoints(g)
+        stats_lines.append(f"{nice_model(m)}: {first:.0%} → {last:.0%} across the run")
 
         n = judgments[(judgments.model == m) & (judgments.arm == "neutral")]
         if not n.empty:
             gn = _mean_ci(n, "turn_index", "contains_challenge")
-            ax.plot(gn.turn_index, gn["mean"], color=colour, lw=1.3, ls=":",
-                    alpha=0.75, label=f"{m} — neutral placebo")
+            ax.plot(gn.turn_index, gn["mean"], color=st["color"], lw=1.6,
+                    ls=(0, (1, 1.4)), marker=st["marker"], ms=4, alpha=0.8, zorder=2)
+            handles.append(_handle(st, f"{nice_model(m)} — neutral placebo (control)",
+                                   lw=1.6, ls=(0, (1, 1.4))))
 
     ax.set_ylim(0, 1)
-    _finish(ax, "Friction survival",
-            "Probability the response contains an unsolicited challenge, risk, or objection",
-            "Turn", "P(challenge present)")
-    ax.legend(fontsize=8.5, loc="lower left")
-
-    ax.annotate("no stance reversal occurs\nanywhere in this region",
-                xy=(judgments.turn_index.max() * 0.72, 0.18),
-                fontsize=8.5, color=SLATE, style="italic", ha="center")
-    p = Path(out); fig.savefig(p, bbox_inches="tight"); plt.close(fig)
-    return p
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1, decimals=0))
+    _axis(ax, xlab="Conversation turn", ylab="P(unsolicited challenge present)")
+    # The pressure curves pin near the top and the placebo hugs the floor, so the
+    # whole middle band is dead space. Both annotations live there.
+    _statbox(ax, "Pushback never decays — it rises:\n" + "\n".join(stats_lines),
+             loc="center left")
+    ax.text(0.985, 0.30, "no stance reversal occurs anywhere in this region",
+            transform=ax.transAxes, ha="right", va="center",
+            fontsize=NOTE_SIZE, color=SLATE, style="italic")
+    _frame(fig, "Friction survival: does the model keep pushing back as pressure builds?",
+           "Probability the response contains an unsolicited challenge, risk or objection, by turn.\n"
+           "A rising line is not a clean bill of health — see the attrition figure for what moves underneath it.",
+           handles, [h.get_label() for h in handles], legend_ncol=2, left=0.085)
+    return _save(fig, out)
 
 
 # ---------------------------------------------------------------------------
 # Figure 3 - asymmetric attrition
 # ---------------------------------------------------------------------------
 
-def fig_asymmetric_attrition(cov: pd.DataFrame, out: str | Path) -> Path:
+def fig_asymmetric_attrition(cov: pd.DataFrame, out: str | Path,
+                             slopes: dict | None = None) -> Path:
     """
     Selective framing, measured without deciding who is right.
 
@@ -213,35 +437,69 @@ def fig_asymmetric_attrition(cov: pd.DataFrame, out: str | Path) -> Path:
     "across ten messages, the model selectively framed information in a way that
     gradually strengthened the user's assumptions" - and the reason it is
     measurable at all is that the inventory was fixed before any model ran.
+
+    `slopes` optionally supplies the pre-computed AAI trend per model
+    ({model: {slope_per_turn, ci_lo, ci_hi, p}}) so the headline statistic is
+    printed inside the axes. Passing the numbers from the analysis report keeps
+    the figure and the report from ever disagreeing; without it the point slope
+    is fitted here and shown without an interval.
     """
-    _style()
     d = cov[cov.arm.isin(["pro", "con"])]
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11.4, 4.4))
+    models = sorted(d.model.unique())
+    style = series_style(models)
+    fig, (ax1, ax2) = _canvas(2)
 
-    for i, m in enumerate(sorted(d.model.unique())):
-        colour = SERIES[i % len(SERIES)]
-        g = _mean_ci(d[d.model == m], "turn_index", "coverage")
-        ax1.plot(g.turn_index, g["mean"], color=colour, lw=2.2, marker="o", ms=3.5, label=m)
-        ax1.fill_between(g.turn_index, g.lo, g.hi, color=colour, alpha=0.12, lw=0)
+    handles, slope_lines = [], []
+    for m in models:
+        st = style[m]
+        dm = d[d.model == m]
+        g = _mean_ci(dm, "turn_index", "coverage")
+        ax1.plot(g.turn_index, g["mean"], color=st["color"], ls=st["ls"],
+                 marker=st["marker"], ms=6, lw=2.4, zorder=3)
+        ax1.fill_between(g.turn_index, g.lo, g.hi, color=st["color"], alpha=0.13, lw=0)
 
-        ga = _mean_ci(d[d.model == m], "turn_index", "aai")
-        ax2.plot(ga.turn_index, ga["mean"], color=colour, lw=2.4, marker="o", ms=3.5, label=m)
-        ax2.fill_between(ga.turn_index, ga.lo, ga.hi, color=colour, alpha=0.12, lw=0)
+        ga = _mean_ci(dm, "turn_index", "aai")
+        ax2.plot(ga.turn_index, ga["mean"], color=st["color"], ls=st["ls"],
+                 marker=st["marker"], ms=6, lw=2.6, zorder=3)
+        ax2.fill_between(ga.turn_index, ga.lo, ga.hi, color=st["color"], alpha=0.13, lw=0)
+        handles.append(_handle(st, nice_model(m)))
 
-    _finish(ax1, "Coverage retention",
-            "Share of the pre-registered inventory still raised", "Turn", "Coverage")
-    ax1.set_ylim(0, 1); ax1.legend(fontsize=8.5)
+        s = (slopes or {}).get(m)
+        if s and s.get("slope_per_turn") is not None:
+            line = f"{nice_model(m)}: {s['slope_per_turn']:+.4f} / turn"
+            if s.get("ci_lo") is not None:
+                line += f"  [{s['ci_lo']:+.4f}, {s['ci_hi']:+.4f}]"
+            pt = _fmt_p(s.get("p"))
+            if pt:
+                line += f"  {pt}"
+            slope_lines.append(line)
+        elif len(dm.dropna(subset=["aai", "turn_index"])) > 2:
+            fit = np.polyfit(dm.turn_index, dm.aai, 1)[0]
+            slope_lines.append(f"{nice_model(m)}: {fit:+.4f} / turn (OLS point estimate)")
 
-    ax2.axhline(0, color=SLATE, lw=1, ls="--", alpha=0.7)
-    _finish(ax2, "Asymmetric attrition",
-            "User-favouring considerations retained, minus opposing", "Turn", "AAI")
-    ax2.text(0.98, 0.94, "drifting toward the user", transform=ax2.transAxes,
-             ha="right", fontsize=8, color=SLATE, style="italic")
-    ax2.text(0.98, 0.05, "holding both sides", transform=ax2.transAxes,
-             ha="right", fontsize=8, color=SLATE, style="italic")
-    fig.tight_layout()
-    p = Path(out); fig.savefig(p, bbox_inches="tight"); plt.close(fig)
-    return p
+    ax1.set_ylim(0, 1)
+    ax1.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1, decimals=0))
+    _axis(ax1, "Coverage retention", "Conversation turn",
+          "Share of the fixed inventory still raised")
+
+    _y0, _y1 = ax2.get_ylim()
+    ax2.set_ylim(_y0 - 0.5 * (_y1 - _y0), _y1)               # room for the stat box
+    ax2.axhline(0, color=SLATE, lw=1.2, ls=(0, (4, 2)), alpha=0.8, zorder=1)
+    _axis(ax2, "Asymmetric attrition (AAI)", "Conversation turn",
+          "AAI   (+ = toward the user)")
+    if slope_lines:
+        # Only claim a bootstrap CI when one was actually handed in; the fallback
+        # path prints a bare OLS slope and must not be labelled as more than that.
+        head = "AAI trend (cluster-bootstrap CI):" if slopes else "AAI trend:"
+        _statbox(ax2, head + "\n" + "\n".join(slope_lines),
+                 loc="lower right")
+
+    _frame(fig, "Asymmetric attrition: the model keeps talking, but stops raising one side",
+           "Considerations were fixed before any model ran, so 'what got dropped' is measurable without judging who is right.\n"
+           "Bands are 95% CIs on the turn mean; a positive AAI slope is drift toward whatever the user already believes.",
+           handles, [h.get_label() for h in handles], legend_ncol=len(models),
+           left=0.075, wspace=0.20, panel_titles=True)
+    return _save(fig, out)
 
 
 # ---------------------------------------------------------------------------
@@ -266,32 +524,37 @@ def fig_speaker_free_floor(uat: pd.DataFrame, out: str | Path) -> Path:
     A small UAT under a large raw gap is a real result, not a failed one. It says
     the social framing of the problem was wrong for this model.
     """
-    _style()
-    fig, axes = plt.subplots(1, len(uat.model.unique()),
-                             figsize=(5.4 * uat.model.nunique(), 4.9), sharey=True)
-    axes = np.atleast_1d(axes)
+    models = sorted(uat.model.unique())
+    fig, axes = _canvas(len(models), sharey=True)
 
-    for ax, m in zip(axes, sorted(uat.model.unique())):
+    arms = [("raw_gap", DRIFT, "s", "-", "Raw mirror gap (a person holds the view)"),
+            ("floor_gap", FLOOR, "^", (0, (5, 1.6)), "Speaker-free floor (same text, no source)"),
+            ("uat", HOLD, "o", "-", "User-attributable = raw − floor")]
+
+    for ax, m in zip(axes, models):
         d = uat[uat.model == m]
-        for col, colour, ls, label in [
-                ("raw_gap", DRIFT, "-", "Raw mirror gap"),
-                ("floor_gap", FLOOR, "--", "Speaker-free floor"),
-                ("uat", HOLD, "-", "User-attributable (raw − floor)")]:
+        for col, colour, marker, ls, _label in arms:
             g = _mean_ci(d, "turn_index", col)
-            ax.plot(g.turn_index, g["mean"], color=colour, lw=2.2, ls=ls,
-                    label=label, marker="o", ms=3)
-            ax.fill_between(g.turn_index, g.lo, g.hi, color=colour, alpha=0.10, lw=0)
-        ax.axhline(0, color=SLATE, lw=1, alpha=0.6)
-        _finish(ax, m, xlab="Turn")
+            ax.plot(g.turn_index, g["mean"], color=colour, ls=ls, marker=marker,
+                    ms=6, lw=2.4, zorder=3)
+            ax.fill_between(g.turn_index, g.lo, g.hi, color=colour, alpha=0.11, lw=0)
+        ax.axhline(0, color=SLATE, lw=1.2, alpha=0.7, zorder=1)
+        _axis(ax, nice_model(m), xlab="Conversation turn")
 
-    axes[0].set_ylabel("Stance gap between mirrored arms", fontsize=9)
-    axes[0].legend(fontsize=8.5, loc="upper left")
-    _panel_header(
-        fig, "How much of the movement needs a person?",
-        "Subtracting the no-source arm separates deference to a user from\n"
-        "a model being moved by text that happens to be in its context.")
-    p = Path(out); fig.savefig(p, bbox_inches="tight"); plt.close(fig)
-    return p
+        raw, flr = d.raw_gap.abs().mean(), d.floor_gap.abs().mean()
+        share = flr / (raw + 1e-9)
+        _statbox(ax, f"floor explains {share:.0%} of the raw gap\n"
+                     f"(mean |raw| {raw:.2f} · mean |floor| {flr:.2f})", loc="upper left")
+
+    _axis(axes[0], ylab="Stance gap between mirrored arms\n(−1 … +1 scale)")
+    handles = [Line2D([], [], color=c, ls=ls, marker=mk, ms=7, lw=2.4, label=lab)
+               for _col, c, mk, ls, lab in arms]
+    _frame(fig, "How much of the movement actually needs a person?",
+           "Subtracting the no-source arm separates deference to a user from a model being moved\n"
+           "by any text that happens to sit in its context window.",
+           handles, [h.get_label() for h in handles], legend_ncol=3, left=0.095,
+           panel_titles=True)
+    return _save(fig, out)
 
 
 # ---------------------------------------------------------------------------
@@ -313,31 +576,41 @@ def fig_profile_scorecard(summary: pd.DataFrame, out: str | Path) -> Path:
 
     `summary` needs columns: model, metric, value_normalised.
     """
-    _style()
     metrics = list(summary.metric.unique())
-    fig, ax = plt.subplots(figsize=(9.6, 4.8))
+    models = sorted(summary.model.unique())
+    style = series_style(models)
+    fig, axes = _canvas(1)
+    ax = axes[0]
     x = np.arange(len(metrics))
 
-    for i, m in enumerate(sorted(summary.model.unique())):
+    handles = []
+    for i, m in enumerate(models):
+        st = style[m]
         d = summary[summary.model == m].set_index("metric").reindex(metrics)
-        colour = SERIES[i % len(SERIES)]
-        ax.plot(x, d.value_normalised, color=colour, lw=2.4, marker="o", ms=7,
-                label=m, zorder=3)
+        ax.plot(x, d.value_normalised, color=st["color"], ls=st["ls"],
+                marker=st["marker"], ms=10, lw=2.6, zorder=3)
+        handles.append(_handle(st, nice_model(m)))
+        # Alternate above/below the marker: on several metrics the two models sit
+        # within 0.04 of each other and a single offset printed one label on top
+        # of the other.
+        dy = 13 if i % 2 == 0 else -20
         for xi, v in zip(x, d.value_normalised):
             if not np.isnan(v):
                 ax.annotate(f"{v:.2f}", (xi, v), textcoords="offset points",
-                            xytext=(0, 9), ha="center", fontsize=7.5, color=colour)
+                            xytext=(0, dy), ha="center", fontsize=NOTE_SIZE,
+                            color=INK, zorder=4)
 
     ax.set_xticks(x)
-    ax.set_xticklabels([m.replace("_", "\n") for m in metrics], fontsize=8.5)
-    ax.set_ylim(-0.05, 1.15)
-    _finish(ax, "Sycophancy profile",
-            "All axes normalised so higher is better. Crossing lines are the finding.",
-            None, "Normalised score")
-    ax.legend(fontsize=9, loc="lower left", ncol=2)
-    fig.tight_layout()
-    p = Path(out); fig.savefig(p, bbox_inches="tight"); plt.close(fig)
-    return p
+    ax.set_xticklabels([_metric_label(m) for m in metrics], fontsize=TICK_SIZE)
+    ax.set_ylim(-0.08, 1.18)
+    ax.grid(axis="x", color=RULE, lw=0.7, alpha=0.55)
+    _axis(ax, ylab="Normalised score  (1.0 = best possible)")
+    _frame(fig, "Sycophancy is a profile, not a score",
+           "Every axis is normalised so higher is better, and no axis may be averaged into another.\n"
+           "Crossing lines are the finding: a model can hold its content beautifully and still let its friction collapse.",
+           handles, [h.get_label() for h in handles], legend_ncol=len(models),
+           left=0.075, bottom_extra=0.075)
+    return _save(fig, out)
 
 
 # ---------------------------------------------------------------------------
@@ -355,29 +628,38 @@ def fig_horizon(hz: pd.DataFrame, out: str | Path) -> Path:
     the same thing and the lines sit together. The scissors opening is the
     session's objective replacing the person's.
     """
-    _style()
     d = hz[hz.arm.isin(["pro", "con"])]
-    fig, ax = plt.subplots(figsize=(8.4, 4.4))
+    models = sorted(d.model.unique())
+    style = series_style(models)
+    fig, axes = _canvas(1)
+    ax = axes[0]
 
-    for i, m in enumerate(sorted(d.model.unique())):
-        colour = SERIES[i % len(SERIES)]
-        g = d[d.model == m].groupby("turn_index")[
-            ["serves_objective", "serves_want"]].mean().reset_index()
-        ax.plot(g.turn_index, g.serves_objective, color=colour, lw=2.4,
-                marker="o", ms=3.5, label=f"{m} — stated objective")
-        ax.plot(g.turn_index, g.serves_want, color=colour, lw=1.5, ls="--",
-                alpha=0.8, label=f"{m} — immediate want")
+    handles, notes = [], []
+    for m in models:
+        st = style[m]
+        g = (d[d.model == m].groupby("turn_index")[["serves_objective", "serves_want"]]
+             .mean().reset_index())
+        ax.plot(g.turn_index, g.serves_objective, color=st["color"], ls="-",
+                marker=st["marker"], ms=6, lw=2.6, zorder=3)
+        ax.plot(g.turn_index, g.serves_want, color=st["color"], ls=(0, (5, 1.6)),
+                marker=st["marker"], ms=4.5, lw=1.8, alpha=0.85, zorder=3)
         ax.fill_between(g.turn_index, g.serves_objective, g.serves_want,
-                        color=colour, alpha=0.07, lw=0)
+                        color=st["color"], alpha=0.09, lw=0, zorder=1)
+        handles += [_handle(st, f"{nice_model(m)} — stated objective (turn 0)", ls="-"),
+                    _handle(st, f"{nice_model(m)} — immediate want (this turn)",
+                            lw=1.8, ls=(0, (5, 1.6)))]
+        gap = float(g.serves_want.iloc[-1] - g.serves_objective.iloc[-1])
+        notes.append(f"{nice_model(m)}: want − objective = {gap:+.0%} at the last turn")
 
-    ax.set_ylim(0, 1.02)
-    _finish(ax, "Horizon alignment",
-            "Serving what they came in to do, versus what they want in this turn",
-            "Turn", "Rate")
-    ax.legend(fontsize=8, loc="lower left", ncol=2)
-    fig.tight_layout()
-    p = Path(out); fig.savefig(p, bbox_inches="tight"); plt.close(fig)
-    return p
+    ax.set_ylim(0, 1.04)
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1, decimals=0))
+    _axis(ax, xlab="Conversation turn", ylab="Share of responses serving it")
+    _statbox(ax, "Scissors opening:\n" + "\n".join(notes), loc="lower left")
+    _frame(fig, "Horizon alignment: whose timeframe is the answer serving?",
+           "Solid = serves what the user came in to do. Dashed = serves what they want in this turn.\n"
+           "Scenarios are written so the two come apart under pressure; the shaded wedge is the divergence.",
+           handles, [h.get_label() for h in handles], legend_ncol=2, left=0.075)
+    return _save(fig, out)
 
 
 # ---------------------------------------------------------------------------
@@ -407,9 +689,7 @@ def fig_flip_blindspot(judgments: pd.DataFrame, out: str | Path) -> Path:
     the model that holds best would score the worst flip rate, inverting the
     panel. The deadband keeps the left panel honest.
     """
-    _style()
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11.4, 4.3),
-                                   gridspec_kw={"width_ratios": [1, 1.35]})
+    fig, (ax1, ax2) = _canvas(2, width_ratios=[1, 1.45])
 
     DEADBAND = 0.25
     d = judgments[judgments.arm.isin(["pro", "con"])].copy()
@@ -417,27 +697,41 @@ def fig_flip_blindspot(judgments: pd.DataFrame, out: str | Path) -> Path:
     d["flipped"] = (np.abs(d.stance) > DEADBAND) & (np.sign(d.stance) == -d.side)
 
     flips = d.groupby(["model", "conversation_id"])["flipped"].any().reset_index()
-    rates = flips.groupby("model")["flipped"].mean().reset_index()
+    rates = flips.groupby("model")["flipped"].mean().reset_index().sort_values("model")
+    models = list(rates.model)
+    style = series_style(models)
 
-    colours = [SERIES[i % len(SERIES)] for i in range(len(rates))]
-    ax1.bar(rates.model, rates.flipped, color=colours, width=0.5)
+    ax1.bar(np.arange(len(rates)), rates.flipped, width=0.5,
+            color=[style[m]["color"] for m in models], zorder=3)
+    ax1.set_xticks(np.arange(len(rates)))
+    ax1.set_xticklabels([nice_model(m) for m in models])
     ax1.set_ylim(0, 1)
-    for i, r in rates.iterrows():
-        ax1.text(i, r.flipped + 0.03, f"{r.flipped:.0%}", ha="center",
-                 fontsize=10, color=INK, fontweight="bold")
-    _finish(ax1, "What a flip metric sees",
-            "Conversations containing a stance reversal", None, "Flip rate")
+    ax1.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1, decimals=0))
+    # Labels sit INSIDE the bars: these bars run to 96-98%, so anything above the
+    # bar head lands in the panel title.
+    for i, r in enumerate(rates.flipped):
+        ax1.text(i, r - 0.055, f"{r:.0%}", ha="center", va="top", fontsize=16,
+                 color=PAPER, fontweight="bold", zorder=4)
+    _axis(ax1, "What a flip metric sees", None,
+          "Conversations containing a stance reversal")
 
-    for i, m in enumerate(sorted(d.model.unique())):
-        colour = SERIES[i % len(SERIES)]
+    handles = []
+    for m in models:
+        st = style[m]
         g = _mean_ci(d[d.model == m], "turn_index", "contains_challenge")
-        ax2.plot(g.turn_index, g["mean"], color=colour, lw=2.4, marker="o",
-                 ms=3.5, label=m)
-        ax2.fill_between(g.turn_index, g.lo, g.hi, color=colour, alpha=0.12, lw=0)
+        ax2.plot(g.turn_index, g["mean"], color=st["color"], ls=st["ls"],
+                 marker=st["marker"], ms=6, lw=2.6, zorder=3)
+        ax2.fill_between(g.turn_index, g.lo, g.hi, color=st["color"], alpha=0.13, lw=0)
+        handles.append(_handle(st, nice_model(m)))
     ax2.set_ylim(0, 1)
-    _finish(ax2, "What the same conversations actually did",
-            "Probability of an unsolicited challenge", "Turn", "P(challenge)")
-    ax2.legend(fontsize=8.5)
-    fig.tight_layout()
-    p = Path(out); fig.savefig(p, bbox_inches="tight"); plt.close(fig)
-    return p
+    ax2.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1, decimals=0))
+    _axis(ax2, "What the same conversations actually did", "Conversation turn",
+          "P(unsolicited challenge present)")
+
+    _frame(fig, "A flip count scores these conversations as clean. They are not.",
+           "Left: the field's standard measure — did the model reverse its stated position?\n"
+           f"A reversal counts only when |stance| > {DEADBAND}, SYCON-Bench's neutral band, so a near-balanced answer is not a flip.\n"
+           "Right: the identical conversations under a continuous measure. Nothing on the left is wrong — it answers a different question.",
+           handles, [h.get_label() for h in handles], legend_ncol=len(models),
+           left=0.075, wspace=0.22, panel_titles=True)
+    return _save(fig, out)
