@@ -34,7 +34,11 @@ data/*.failures.json
 data/*.bak
 
 # Local run outputs (intermediate/staged figures and logs — not for the public repo)
-figures_stage*/
+# figures_stageD_full PNGs are the real-run figures the README embeds, so those stay tracked
+figures_stageC/
+figures_stageD/
+figures_stageD_full/*
+!figures_stageD_full/*.png
 logs/
 
 # Local-only working files (excluded from public repo)
