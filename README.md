@@ -23,15 +23,15 @@ Pick the door that matches why you came:
 | **Understand the method step by step** (runnable, free, no API keys) | [`walkthrough/walkthrough.ipynb`](walkthrough/walkthrough.ipynb) |
 | **Understand each metric's math** | [`walkthrough/metrics_deep_dive.ipynb`](walkthrough/metrics_deep_dive.ipynb) |
 | **Run it yourself** | [Quick start](#quick-start) below |
-| **Read the full design rationale** | [`docs/00-design.md`](docs/00-design.md) → [`docs/06-authoring.md`](docs/06-authoring.md) |
+| **Read the full design rationale** | [`docs/`](docs/) — start with [`docs/00-design.md`](docs/00-design.md) |
 
-**Project status (verified 2026-08-04):**
+**Project status (verified 2026-08-05):**
 
 - ✅ Test suite: **35 passed, 3 skipped** (the skips only exercise live SDK keys)
 - ✅ Metrics validated against synthetic conversations with planted, known drift
-- ✅ **Live run completed** — 2 production models, 14 scenarios, 560 full conversations, 6,496 judged turns, ~$270 in API spend (per-stage cost logs kept locally in `logs/`)
+- ✅ **Live run completed** — 2 production models, 14 scenarios, 560 full conversations, 6,496 judged turns; ≈ $282 on the subject + primary-judge side, plus roughly $100 of Gemini judging at list prices (per-stage cost logs kept locally in `logs/`)
 - ✅ Every turn scored by **two independent cross-family judges**, with per-code reliability (Krippendorff's α) published below
-- ⏳ Remaining: a human-coded subsample to anchor judge validity; scenarios beyond the first domain
+- ⏳ Remaining: human validation of the judge is **in progress** — a blind, stratified coding sheet (n = 150) has been generated and awaits hand-labels; scenarios beyond the first domain
 
 ---
 
@@ -80,7 +80,7 @@ The full plain-English writeup — one conversation read in full, every figure, 
 
 ## How much of it to trust
 
-Everything downstream depends on the extraction judge, so the run publishes **Krippendorff's α per code, per judge pair, at n = 6,496** — never pooled, never buried. The bar for confirmatory claims is **α = 0.67**; below it, a code is exploratory.
+Everything downstream depends on the extraction judge, so the run publishes **Krippendorff's α per code, per judge pair, at n = 6,496** — never pooled, never buried. The gates are two-tiered: **α ≥ 0.80** qualifies a code for confirmatory claims, **0.67 ≤ α < 0.80** marks it exploratory, and below 0.67 a code is below the bar — only cross-judge directional replications are noted for it.
 
 | Code | α (2 judges, n=6,496) | Tier | Note |
 |---|---:|---|---|
@@ -101,7 +101,7 @@ Everything downstream depends on the extraction judge, so the run publishes **Kr
 | `hedging` | 0.126 | Below bar | |
 | `directness` | −0.137 | Below bar | delivery-channel noise; do not interpret |
 
-In short: **the AAI headline is safe** (rides on a code above the bar, replicates across judge families), **the friction finding is exploratory** (its code falls short), and **the flip-reframe is safe** (rests on the single most reliable code, not the least). A stratified human-coded subsample is the remaining validation piece.
+In short: **the AAI headline is safe** (its code clears the α ≥ 0.67 bar at 0.757 and replicates across judge families), **the friction finding is exploratory** (its code falls short), and **the flip-reframe is safe** (rests on the single most reliable code, not the least). The stratified human-coded subsample that anchors judge validity is in progress: the blind coding sheet exists and awaits hand-labels.
 
 ---
 
@@ -183,7 +183,7 @@ python scripts/run_study.py --models claude-sonnet-4-6 claude-opus-4-6 \
 python scripts/analyze.py         # metrics, statistics, figures
 ```
 
-Each turn resends the accumulated history, so **cost grows super-linearly with conversation length** — the run behind this README cost roughly **$270**. The runner caches and resumes, so a rate-limited key can spread a run across days at no extra cost. Prefer more scenarios at moderate length over a few very long conversations.
+Each turn resends the accumulated history, so **cost grows super-linearly with conversation length** — the run behind this README logged ≈ $282 on the subject + primary-judge side, plus roughly $100 of Gemini judging at list prices. The runner caches and resumes, so a rate-limited key can spread a run across days at no extra cost. Prefer more scenarios at moderate length over a few very long conversations.
 
 ---
 
@@ -205,15 +205,18 @@ harness/
 ├── scenarios/
 │   ├── real-scenarios/      # 14 pre-registered live-run scenarios (S04–S17)
 │   └── test-scenarios/      # 3 synthetic-pipeline scenarios (S01–S03)
-├── scripts/                 # demo_synthetic, estimate_cost, run_study, analyze, add_judge
-├── tests/                   # the validation suite (35 tests)
-├── data/                    # REAL RUN OUTPUT: judgments*.jsonl, report.json, reliability CSVs
-├── logs/                    # per-stage run logs with cost accounting
+├── scripts/                 # demo_synthetic, estimate_cost, run_study, analyze,
+│                            #   add_judge, check_mirror, render_figures, make_results_notebook
+├── tests/                   # the validation suite (38 tests: 35 run offline, 3 need live keys)
+├── data/                    # run output — mostly gitignored, but report.json (headline stats)
+│                            #   and judgments.stageD_full.reliability.csv (per-code α) are committed
+├── logs/                    # per-stage run logs with cost accounting (local only, gitignored)
 ├── figures/                 # synthetic validation figures
 ├── figures_stageD_full/     # real-run figures (the ones above)
 ├── results/                 # HARNESS_results.ipynb — the full writeup
 ├── walkthrough/             # first_time_tour, walkthrough, metrics_deep_dive notebooks
-└── docs/                    # 00-design … 06-authoring
+└── docs/                    # 00-design, 01-metrics, 02-threats, 03-prior-art,
+                             #   04-test-suite, 06-authoring
 ```
 
 The stage naming in `data/` and `logs/`: **Stage A** = smoke test, **Stage B** = positive controls, **Stage C** = first real batch, **Stage D / D-full** = the complete run with both judges.
@@ -225,7 +228,7 @@ The stage naming in `data/` and `logs/`: **Stage A** = smoke test, **Stage B** =
 Read these before quoting anything:
 
 - **Domain concentration.** All 14 live-run scenarios are basketball debates. That was a deliberate scope control for Study 1 — one domain, tightly matched inventories — but it means the findings generalize to *these scenarios*, not to models in general. Scenarios are the unit of generalization; broader domains are the next study.
-- **Judge validity is the weakest link.** Addressed head-on with a second cross-family judge and per-code α, but a stratified human-coded subsample is still the missing piece, and it gates everything downstream.
+- **Judge validity is the weakest link.** Addressed head-on with a second cross-family judge and per-code α, and a stratified human-coded subsample is underway (blind coding sheet generated, hand-labels pending) — until it lands, it gates everything downstream.
 - **Scripted pressure is not natural conversation.** Real users change subjects and contradict themselves. The escalation ladder is a controlled dose, not a model of dialogue. (A live user-simulator would react to the model and break the matched pro/con mirror — that's why scripts were chosen.)
 - **The `nosource` arm is an imperfect placebo.** Removing the person also removes stakes and conversational obligation, so it *bounds* the social component rather than isolating it.
 - **Divergence-channel magnitudes are noisy.** Trust directions and replications, not precise sizes.
