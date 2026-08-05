@@ -543,24 +543,35 @@ the wrong lens for this particular failure — the challenges keep coming even a
 content moves underneath them.
 """)
 code(r'''
+import sys
+sys.path.insert(0, str(ROOT))
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from harness import plots as hp     # same house style as the saved figures
 
+hp.set_house_style()
 push = J[J.arm.isin(["pro", "con"])]
-fig, axes = plt.subplots(1, 2, figsize=(11, 4), sharey=True)
+measures = [("contains_challenge", hp.HOLD, "o", "-",
+             "Did it push back? (yes/no — saturates)"),
+            ("challenge_strength", hp.DRIFT, "s", (0, (5, 1.6)),
+             "How strong was the pushback? (0–1 — room to move)")]
+
+fig, axes = hp.canvas(2, sharey=True)
 for ax, m in zip(axes, MODELS):
     d = push[push.model == m]
-    binary = d.groupby("turn_index").contains_challenge.mean()      # yes/no, saturates
-    strength = d.groupby("turn_index").challenge_strength.mean()    # continuous
-    ax.plot(binary.index, binary.values, "-o", label="did it push back? (yes/no)")
-    ax.plot(strength.index, strength.values, "-s", label="how strong was the pushback?")
-    ax.axhline(1.0, ls=":", lw=1, color="grey")
-    ax.set_title(NICE[m]); ax.set_xlabel("turn"); ax.set_ylim(0, 1.05)
-    ax.grid(alpha=.3)
-axes[0].set_ylabel("rate / strength (0–1)")
-axes[0].legend(loc="lower right", fontsize=8)
-fig.suptitle("Pushback saturates (yes/no) while its strength still has room to move — "
-             "and neither one decays", fontsize=11)
-fig.tight_layout()
+    for col, colour, marker, ls, _label in measures:
+        g = d.groupby("turn_index")[col].mean()
+        ax.plot(g.index, g.values, color=colour, ls=ls, marker=marker, ms=6, lw=2.4)
+    ax.axhline(1.0, ls=":", lw=1.2, color=hp.SLATE, alpha=0.8)
+    ax.set_title(NICE[m]); ax.set_xlabel("Conversation turn"); ax.set_ylim(0, 1.08)
+axes[0].set_ylabel("Rate / strength (0–1)")
+
+handles = [Line2D([], [], color=c, ls=ls, marker=mk, ms=7, lw=2.4, label=lab)
+           for _col, c, mk, ls, lab in measures]
+hp.frame(fig, "Pushback saturates, but its strength still has room to move — and neither decays",
+         "One panel per model. The yes/no flag pins at the ceiling and stops registering anything;\n"
+         "the continuous strength measure is not pinned, and it does not fade either.",
+         handles, [h.get_label() for h in handles], legend_ncol=2, panel_titles=True)
 plt.show()
 
 # The content-invariance test: is the *substance* stable across the conversation?
