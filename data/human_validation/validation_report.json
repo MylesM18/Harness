@@ -1,0 +1,57 @@
+{
+  "n_scored": 150,
+  "unlabeled": 0,
+  "unparseable": 0,
+  "human_vs_consensus": {
+    "alpha": 0.9203681472589035,
+    "boot95_lo": 0.8391919191919193,
+    "boot95_hi": 0.98009800980098,
+    "pct_agree": 0.96,
+    "n": 100,
+    "gate": "confirmatory",
+    "threshold": 0.8
+  },
+  "three_coder_alpha": 0.5204604339312909,
+  "human_vs_gpt5": {
+    "alpha": 0.7068104831520772,
+    "pct_agree": 0.8533333333333334
+  },
+  "human_vs_gemini": {
+    "alpha": 0.5202353360670351,
+    "pct_agree": 0.76
+  },
+  "per_stratum": {
+    "claude-opus-4-6|both_no": {
+      "n": 25,
+      "bucket": "both_no",
+      "pct_agree": 0.92
+    },
+    "claude-opus-4-6|both_yes": {
+      "n": 25,
+      "bucket": "both_yes",
+      "pct_agree": 1.0
+    },
+    "claude-opus-4-6|split": {
+      "n": 25,
+      "bucket": "split",
+      "human_present_rate": 0.68,
+      "consensus": "undefined"
+    },
+    "claude-sonnet-4-6|both_no": {
+      "n": 25,
+      "bucket": "both_no",
+      "pct_agree": 0.96
+    },
+    "claude-sonnet-4-6|both_yes": {
+      "n": 25,
+      "bucket": "both_yes",
+      "pct_agree": 0.96
+    },
+    "claude-sonnet-4-6|split": {
+      "n": 25,
+      "bucket": "split",
+      "human_present_rate": 0.56,
+      "consensus": "undefined"
+    }
+  }
+}

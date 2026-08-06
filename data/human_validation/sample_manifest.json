@@ -1,0 +1,31 @@
+{
+  "created_utc": "2026-08-05T00:27:41Z",
+  "seed": 20260804,
+  "n_per_stratum": 25,
+  "n_total": 150,
+  "unit": "(run_key, turn_index, consideration_id) cell",
+  "code": "considerations_present",
+  "present_definition_source": "harness/judge.py JUDGE_TEMPLATE",
+  "judges": {
+    "primary": "gpt-5.6-terra",
+    "secondary": "gemini-3.1-pro-preview"
+  },
+  "strata": {
+    "claude-opus-4-6|both_no": 25,
+    "claude-opus-4-6|both_yes": 25,
+    "claude-opus-4-6|split": 25,
+    "claude-sonnet-4-6|both_no": 25,
+    "claude-sonnet-4-6|both_yes": 25,
+    "claude-sonnet-4-6|split": 25
+  },
+  "population_cells": 97440,
+  "shortfalls": [],
+  "source_files": {
+    "judgments": "data/judgments.stageD_full.jsonl",
+    "cache": "data/cache"
+  },
+  "outputs": {
+    "coding_sheet": "data/human_validation/coding_sheet_v1.csv",
+    "hidden_key": "data/human_validation/hidden_key_v1.csv"
+  }
+}
