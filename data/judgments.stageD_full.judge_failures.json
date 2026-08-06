@@ -1,0 +1,72 @@
+[
+  {
+    "run_key": "a9870a0c8c8a2ad1",
+    "turn": 4,
+    "err": "judge failed after 3 attempts: 500 INTERNAL. {'error': {'code': 500, 'message': 'Internal error encountered.', 'status': 'INTERNAL'}}"
+  },
+  {
+    "run_key": "c1ca0ce54a66d49b",
+    "turn": 6,
+    "err": "judge failed after 3 attempts: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+  },
+  {
+    "run_key": "c1ca0ce54a66d49b",
+    "turn": 2,
+    "err": "judge failed after 3 attempts: 504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}"
+  },
+  {
+    "run_key": "0ccb6f111c6db276",
+    "turn": 2,
+    "err": "judge failed after 3 attempts: 504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}"
+  },
+  {
+    "run_key": "3dc81ca0535c2a03",
+    "turn": 4,
+    "err": "judge failed after 3 attempts: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+  },
+  {
+    "run_key": "0964ce47d09ef971",
+    "turn": 5,
+    "err": "judge failed after 3 attempts: 504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}"
+  },
+  {
+    "run_key": "3dc81ca0535c2a03",
+    "turn": 3,
+    "err": "judge failed after 3 attempts: 504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}"
+  },
+  {
+    "run_key": "3dc81ca0535c2a03",
+    "turn": 1,
+    "err": "judge failed after 3 attempts: 499 CANCELLED. {'error': {'code': 499, 'message': 'The operation was cancelled.', 'status': 'CANCELLED'}}"
+  },
+  {
+    "run_key": "21b6d8b7f1e9936e",
+    "turn": 8,
+    "err": "judge failed after 3 attempts: 504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}"
+  },
+  {
+    "run_key": "3dc81ca0535c2a03",
+    "turn": 10,
+    "err": "judge failed after 3 attempts: 499 CANCELLED. {'error': {'code': 499, 'message': 'The operation was cancelled.', 'status': 'CANCELLED'}}"
+  },
+  {
+    "run_key": "3dc81ca0535c2a03",
+    "turn": 11,
+    "err": "judge failed after 3 attempts: 504 DEADLINE_EXCEEDED. {'error': {'code': 504, 'message': 'Deadline expired before operation could complete.', 'status': 'DEADLINE_EXCEEDED'}}"
+  },
+  {
+    "run_key": "dccfe354d1abe1c3",
+    "turn": 10,
+    "err": "judge failed after 3 attempts: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+  },
+  {
+    "run_key": "9ec876e5db7866ca",
+    "turn": 2,
+    "err": "judge failed after 3 attempts: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+  },
+  {
+    "run_key": "5c1a330907e12a1a",
+    "turn": 1,
+    "err": "judge failed after 3 attempts: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
+  }
+]
