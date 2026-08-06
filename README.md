@@ -19,19 +19,20 @@ Choose the option that best matches why you are here:
 | You want to…                                                                             | Go to                                                                        |
 | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | **See what the live run found** (no code, GitHub renders it)                             | [`results/HARNESS_results.ipynb`](results/HARNESS_results.ipynb)             |
-| **Get oriented in 15 minutes**, with a guided tour of the repo, the run, and the numbers | [`walkthrough/first_time_tour.ipynb`](walkthrough/first_time_tour.ipynb)     |
-| **Understand the method step by step** (runnable, free, no API keys)                     | [`walkthrough/walkthrough.ipynb`](walkthrough/walkthrough.ipynb)             |
+| **Get oriented in 15 minutes**, with a guided tour of the repo, the run, and the numbers | [`walkthrough/first_time_tour.ipynb`](walkthrough/first_time_tour.ipynb) |
 | **Understand each metric's math**                                                        | [`walkthrough/metrics_deep_dive.ipynb`](walkthrough/metrics_deep_dive.ipynb) |
+| **Inspect the completed human validation**                                                | [Filled CSV](data/human_validation/coding_sheet_v1.filled.csv) or [filled HTML worksheet](data/human_validation/coding_worksheet_v1.filled.html) |
 | **Run it yourself**                                                                      | [Quick start](#quick-start) below                                            |
 | **Read the full design rationale**                                                       | [`docs/`](docs/), starting with [`docs/00-design.md`](docs/00-design.md)     |
 
-**Project status (verified 2026-08-05):**
+**Project status (verified 2026-08-06):**
 
 * ✅ Test suite: **35 passed, 3 skipped** (the skipped tests only exercise live SDK keys)
 * ✅ Metrics validated against synthetic conversations with planted, known drift
 * ✅ **Live run completed**: 2 production models, 14 scenarios, 560 full conversations, 6,496 judged turns; ≈ $282 on the subject + primary-judge side, plus roughly $100 of Gemini judging at list prices (per-stage cost logs are kept locally in `logs/`)
 * ✅ Every turn scored by **two independent cross-family judges**, with per-code reliability (Krippendorff's α) published below
-* ⏳ Remaining: human validation of the judge is **in progress**. A blind, stratified coding sheet (n = 150) has been generated and is waiting for hand-labels, along with scenarios beyond the first domain
+* ✅ **Human validation completed**: the blind, stratified coding sample (n = 150) produced **α = 0.920** for `considerations_present`, placing the code that carries the AAI headline in the confirmatory tier. View the [filled CSV](data/human_validation/coding_sheet_v1.filled.csv) or the [filled HTML worksheet](data/human_validation/coding_worksheet_v1.filled.html)
+* ⏳ Remaining: scenarios beyond the first domain
 
 ---
 
@@ -80,15 +81,15 @@ The full plain-English writeup, including one complete conversation, every figur
 
 ## How much of it to trust
 
-Everything that follows depends on the extraction judge, so the run publishes **Krippendorff's α for every code and judge pair at n = 6,496**. The results are never pooled or hidden. The reliability thresholds have two main tiers: **α ≥ 0.80** qualifies a code for confirmatory claims, while **0.67 ≤ α < 0.80** marks it as exploratory. Anything below 0.67 falls below the bar, so only directional findings that replicate across judges are mentioned.
+Everything that follows depends on the extraction judge, so the run publishes **Krippendorff's α for every code and judge pair at n = 6,496**. The results are never pooled or hidden. The reliability thresholds have two main tiers: **α ≥ 0.80** qualifies a code for confirmatory claims, while **0.67 ≤ α < 0.80** marks it as exploratory. Anything below 0.67 falls below the bar, so only directional findings that replicate across judges are mentioned. Human validation is reported separately because it measures agreement against hand-labels rather than agreement between the two model judges.
 
-| Code                          | α (2 judges, n=6,496) | Tier            | Note                                     |
-| ----------------------------- | --------------------: | --------------- | ---------------------------------------- |
+| Code                          | α (2 judges, n=6,496) | Cross-judge tier | Note                                     |
+| ----------------------------- | --------------------: | ---------------- | ---------------------------------------- |
 | `stance`                      |                 0.867 | Confirmatory    | carries the flip-reframe                 |
 | `praise_of_user`              |                 0.862 | Confirmatory    |                                          |
 | `validation_language`         |                 0.839 | Confirmatory    |                                          |
 | `serves_immediate_want`       |                 0.767 | Exploratory     |                                          |
-| **`considerations_present`**  |             **0.757** | **Exploratory** | **AAI primary, clears the bar**          |
+| **`considerations_present`**  |             **0.757** | **Exploratory**  | **AAI primary; human-validated below**   |
 | `warmth`                      |                 0.740 | Exploratory     |                                          |
 | `challenge_strength`          |                 0.638 | Below bar       | direction replicates across judges       |
 | `serves_stated_objective`     |                 0.610 | Below bar       |                                          |
@@ -101,7 +102,11 @@ Everything that follows depends on the extraction judge, so the run publishes **
 | `hedging`                     |                 0.126 | Below bar       |                                          |
 | `directness`                  |                −0.137 | Below bar       | delivery-channel noise; do not interpret |
 
-The takeaway is straightforward: **the AAI headline is safe** because its code clears the α ≥ 0.67 threshold at 0.757 and replicates across judge families. **The friction finding is exploratory** because its code falls below the threshold. **The flip-reframe is also safe** because it relies on the most reliable code rather than the least reliable one. The stratified human-coded subsample used to anchor judge validity is still in progress. The blind coding sheet has been created and is waiting for hand-labels.
+### Human validation
+
+The blind, stratified human-coded sample (n = 150) is now complete. For `considerations_present`, the human-validation result reached **α = 0.920**, placing it in the **confirmatory** tier. This directly validates the extraction code that carries the AAI headline. The completed materials are available as a [filled CSV](data/human_validation/coding_sheet_v1.filled.csv) and a [filled HTML worksheet](data/human_validation/coding_worksheet_v1.filled.html).
+
+The takeaway is straightforward: **the AAI headline is now supported by both cross-family replication and direct human validation**. The two model judges agree on `considerations_present` at α = 0.757, and the completed human validation reaches α = 0.920. **The friction finding remains exploratory** because its code falls below the reliability threshold. **The flip-reframe is also safe** because it relies on the most reliable cross-judge code rather than the least reliable one.
 
 ---
 
@@ -228,14 +233,14 @@ The stage names used in `data/` and `logs/` are: **Stage A** = smoke test, **Sta
 Read these before quoting any of the results:
 
 * **Domain concentration.** All 14 live-run scenarios are basketball debates. This was an intentional scope control for Study 1, using one domain with tightly matched inventories. However, it also means the findings generalize to *these scenarios*, not to models overall. Scenarios are the unit of generalization, and broader domains are the next study.
-* **Judge validity is the weakest link.** This is addressed directly through a second cross-family judge, per-code α, and a stratified human-coded subsample that is currently underway (the blind coding sheet has been generated, with hand-labels still pending). Until that work is complete, it limits everything downstream.
+* **Judge validity remains a core dependency.** The code carrying the AAI headline, `considerations_present`, is now directly human-validated at **α = 0.920**, in addition to cross-family judge agreement at α = 0.757. This strengthens the main result, but codes without separate human validation should still be interpreted according to their published cross-judge reliability tier.
 * **Scripted pressure is not natural conversation.** Real users change topics and contradict themselves. The escalation ladder provides a controlled dose of pressure, not a full model of real dialogue. (A live user-simulator would respond to the model and break the matched pro/con mirror, which is why scripts were used.)
 * **The `nosource` arm is an imperfect placebo.** Removing the person also removes the stakes and sense of conversational obligation, so it *bounds* the social component instead of perfectly isolating it.
 * **Divergence-channel magnitudes are noisy.** Focus on the directions and replications rather than the exact sizes.
 
 ---
 
-## Prior work and the gap HARNESS fills
+## Prior work and the gap HARNESS is working to fill
 
 | Work                                             | Primary measure                              |     Turns | Remaining gap                        |
 | ------------------------------------------------ | -------------------------------------------- | --------: | ------------------------------------ |
@@ -260,4 +265,3 @@ See [`docs/03-prior-art.md`](docs/03-prior-art.md) for the annotated list. All y
 ## License
 
 MIT.
-
